@@ -4,6 +4,7 @@ import (
 	"testing"
 )
 
+// TestGet тестирует функцию Get с использованием фейкового хранилища
 func TestGet(t *testing.T) {
 	db := DB{
 		repo: map[string]string{
@@ -16,37 +17,37 @@ func TestGet(t *testing.T) {
 	tt := []struct {
 		name    string
 		key     string
-		wantUrl string
+		wantURL string
 		wantErr bool
 	}{
 		{
 			name:    "Normal case #1",
 			key:     "key1",
-			wantUrl: "url1",
+			wantURL: "url1",
 			wantErr: false,
 		},
 		{
 			name:    "Normal case #2",
 			key:     "key2",
-			wantUrl: "url2",
+			wantURL: "url2",
 			wantErr: false,
 		},
 		{
 			name:    "Empty key",
 			key:     "",
-			wantUrl: "url",
+			wantURL: "url",
 			wantErr: false,
 		},
 		{
 			name:    "Empty Url",
 			key:     "key",
-			wantUrl: "",
+			wantURL: "",
 			wantErr: false,
 		},
 		{
 			name:    "Key not found",
 			key:     "key999",
-			wantUrl: "",
+			wantURL: "",
 			wantErr: true,
 		},
 	}
@@ -60,13 +61,15 @@ func TestGet(t *testing.T) {
 					t.Errorf("Expected no err, got error: %v", err)
 				}
 			}
-			if url != tc.wantUrl {
-				t.Errorf("Expected url = %v, got %v", tc.wantUrl, url)
+			if url != tc.wantURL {
+				t.Errorf("Expected url = %v, got %v", tc.wantURL, url)
 			}
 		})
 	}
 }
 
+// TestInmem тестирует связку Store - Get. В зависимости от поля "action" ("store",
+// "get" и "both") выполняются тесты обоих методов.
 func TestInmem(t *testing.T) {
 	type args struct {
 		key string
@@ -115,7 +118,8 @@ func TestInmem(t *testing.T) {
 				if err := d.Store(tc.args.key, tc.args.url); (err != nil) != tc.wantErrStore {
 					t.Errorf("DB.Store() error = %v, wantErr %v", err, tc.wantErrStore)
 				}
-			} else if tc.action == "get" || tc.action == "both" {
+			}
+			if tc.action == "get" || tc.action == "both" {
 				url, err := d.Get(tc.args.key)
 				if (err != nil) != tc.wantErrGet {
 					t.Fatalf("DB.Get() error = %v, wantErr %v", err, tc.wantErrGet)

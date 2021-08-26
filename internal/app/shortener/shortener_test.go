@@ -7,17 +7,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/inmem"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
 )
 
+// TestShortener - комплексный тест, прогоняющий все виды запросов к inmemory хранилищу.
 func TestShortener(t *testing.T) {
 	type want struct {
 		statusCode int
 		body       string
 		location   string
 	}
-	// Аргументы для GET тестов. Первые два поля заполняются POST тестами
+	// Аргументы для GET тестов (ключ, по которому должен выдаться сохраненный URL).
+	// Первые два поля заполняются POST тестами.
 	args := []string{
 		"",            // заполняется POST тестом №1
 		"",            // заполняется POST тестом №2
@@ -88,10 +91,10 @@ func TestShortener(t *testing.T) {
 			},
 		},
 		{
-			name: "Test GET#4 - fake key (not stored in repo)",
+			name: "Test GET#4 - unknown key (not stored in repo)",
 			arg:  &args[2],
 			want: want{
-				statusCode: http.StatusNotFound, // ***вопрос - такой должен быть статус?
+				statusCode: http.StatusNotFound, // ***вопрос - такой ли должен быть статус?
 				body:       "URL not found",
 			},
 		},
@@ -105,7 +108,8 @@ func TestShortener(t *testing.T) {
 		},
 	}
 	db := inmem.NewDB()
-	s := shortener.NewShortener(db)
+	s := shortener.NewShortener("http://localhost", ":8080", db)
+
 	// запускаем тесты POST
 	for _, tc := range testsPost {
 		t.Run(tc.name, func(t *testing.T) {
@@ -140,6 +144,7 @@ func TestShortener(t *testing.T) {
 				path = *tc.arg
 			}
 			r := httptest.NewRequest("GET", "/"+path, nil)
+			r = mux.SetURLVars(r, map[string]string{"id": path}) // чтобы горилла отработала на совесть
 			w := httptest.NewRecorder()
 			h := http.HandlerFunc(s.DecodeURL)
 			h.ServeHTTP(w, r)

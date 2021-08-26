@@ -10,39 +10,33 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/inmem"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
 )
 
-// controller перенаправляет запрос '/' на обработчика в зависимости от метода
-func controller(s *shortener.Shortener) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			s.DecodeURL(w, r)
-		case http.MethodPost:
-			s.ShortenURL(w, r)
-		default:
-			log.Printf("controller: method not allowed: %v", r.Method)
-			http.Error(w, "Wrong method", http.StatusMethodNotAllowed)
-		}
-	}
-}
+const (
+	host = "http://localhost"
+	port = ":8080"
+)
 
 func main() {
 	rand.Seed(time.Now().UnixNano()) // ***вопрос*** это лучше делать здесь или каждый раз при генерации ключа?
 	db := inmem.NewDB()
-	s := shortener.NewShortener(db)
+	s := shortener.NewShortener(host, port, db)
+	router := mux.NewRouter()
+	router.HandleFunc("/{id}", s.DecodeURL).Methods(http.MethodGet)
+	router.HandleFunc("/", s.ShortenURL).Methods(http.MethodPost)
 	server := http.Server{
-		Addr: ":8080",
+		Addr:    port,
+		Handler: router,
 	}
-	http.HandleFunc("/", controller(s))
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
 
 	// ***вопрос*** или лучше механизм graceful shutdown запустить в горутину?
 	go server.ListenAndServe()
-	log.Println("Shortener server is listening at :8080...")
+	log.Printf("Shortener server is listening at %s...", port)
 
 	<-sigint
 	fmt.Print("Shutting down... ")
