@@ -7,8 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/inmem"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
+	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
 )
 
 func TestShortener(t *testing.T) {
@@ -115,14 +117,10 @@ func TestShortener(t *testing.T) {
 			h.ServeHTTP(w, r)
 
 			res := w.Result()
-			if res.StatusCode != tc.want.statusCode {
-				t.Errorf("Expected status code %v, got %v", tc.want.statusCode, res.StatusCode)
-			}
+			assert.Equal(t, tc.want.statusCode, res.StatusCode)
 			defer res.Body.Close()
 			body, err := io.ReadAll(res.Body)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			url := string(body)
 			if res.StatusCode != http.StatusCreated && !strings.HasPrefix(url, tc.want.body) {
 				t.Errorf("Expected return body has prefix '%v', got '%v'", tc.want.body, url)
@@ -145,24 +143,16 @@ func TestShortener(t *testing.T) {
 			h.ServeHTTP(w, r)
 
 			res := w.Result()
-			if res.StatusCode != tc.want.statusCode {
-				t.Errorf("Expected status code %v, got %v", tc.want.statusCode, res.StatusCode)
-			}
+			assert.Equal(t, tc.want.statusCode, res.StatusCode)
 			defer res.Body.Close()
 			b, err := io.ReadAll(res.Body)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			body := strings.TrimSpace(string(b))
 			if res.StatusCode == http.StatusTemporaryRedirect {
 				location := res.Header.Get("Location")
-				if location != tc.want.location {
-					t.Errorf("Expected location %v, got %v", tc.want.location, location)
-				}
+				assert.Equal(t, tc.want.location, location)
 			} else {
-				if body != tc.want.body {
-					t.Errorf("Expected body '%v', got '%v'", tc.want.body, body)
-				}
+				assert.Equal(t, tc.want.body, body)
 			}
 		})
 	}

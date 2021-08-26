@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
+	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/db"
 )
 
-var _ shortener.DB = &DB{}
+var _ db.DB = (*DB)(nil)
 
-// DB - реализация интерфейса DB c inmemory хранилищем (map с RW Mutex)
+// DB - реализация интерфейса DB c thread-safe inmemory хранилищем (map с RW Mutex).
 type DB struct {
 	sync.RWMutex
 
@@ -17,7 +17,7 @@ type DB struct {
 }
 
 // New инициализирует структуру in-memory хранилища
-func NewDB() shortener.DB {
+func NewDB() db.DB {
 	return &DB{
 		repo: make(map[string]string),
 	}
