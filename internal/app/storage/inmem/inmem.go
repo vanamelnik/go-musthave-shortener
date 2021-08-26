@@ -9,7 +9,7 @@ import (
 
 var _ storage.Storage = (*DB)(nil)
 
-// DB - реализация интерфейса DB c inmemory хранилищем (map с RW Mutex)
+// DB - реализация интерфейса DB c thread-safe inmemory хранилищем (map с RW Mutex)
 type DB struct {
 	sync.RWMutex
 
