@@ -4,6 +4,7 @@ import (
 	"testing"
 )
 
+// TestGet тестирует функцию Get с использованием фейкового хранилища.
 func TestGet(t *testing.T) {
 	db := DB{
 		repo: map[string]string{
@@ -67,6 +68,8 @@ func TestGet(t *testing.T) {
 	}
 }
 
+// TestInmem тестирует связку Store - Get. В зависимости от поля "action" ("store",
+// "get" и "both") выполняются тесты обоих методов.
 func TestInmem(t *testing.T) {
 	type args struct {
 		key string
@@ -115,7 +118,8 @@ func TestInmem(t *testing.T) {
 				if err := d.Store(tc.args.key, tc.args.url); (err != nil) != tc.wantErrStore {
 					t.Errorf("DB.Store() error = %v, wantErr %v", err, tc.wantErrStore)
 				}
-			} else if tc.action == "get" || tc.action == "both" {
+			}
+			if tc.action == "get" || tc.action == "both" {
 				url, err := d.Get(tc.args.key)
 				if (err != nil) != tc.wantErrGet {
 					t.Errorf("DB.Get() error = %v, wantErr %v", err, tc.wantErrGet)

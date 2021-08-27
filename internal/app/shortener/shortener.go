@@ -7,9 +7,10 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
+
+	"github.com/gorilla/mux"
 )
 
 // keyLength определяет длину ключа короткого адреса.
@@ -17,13 +18,17 @@ const keyLength = 8
 
 // Shortener - сервис создания, хранения и получения коротких URL адресов.
 type Shortener struct {
-	db storage.Storage
+	db   storage.Storage
+	port string
+	host string
 }
 
 // NewShortener инициализирует новую структуру Shortener с использованием заданного хранилища.
-func NewShortener(db storage.Storage) *Shortener {
+func NewShortener(host, port string, db storage.Storage) *Shortener {
 	return &Shortener{
-		db: db,
+		port: port,
+		host: host,
+		db:   db,
 	}
 }
 
@@ -32,8 +37,8 @@ func NewShortener(db storage.Storage) *Shortener {
 //
 // POST /
 func (s *Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("shortener: ShortenURL: %v", err)
 		http.Error(w, "Sorry, something went worng...", http.StatusInternalServerError)
@@ -51,12 +56,11 @@ func (s *Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	for {
 		key := generateKey()
 		if _, err := s.db.Get(key); err != nil {
-			// nolint:errcheck не проверяем ошибку, т.к. уникальность ключа только что проверена.
-			s.db.Store(key, url.String())
+			// nolint:errcheck
+			s.db.Store(key, url.String()) // не проверяем ошибку, т.к. уникальность ключа только что проверена.
 			log.Printf("shortener: ShortenURL: created a token %v for %v", key, url)
 			w.WriteHeader(http.StatusCreated)
-			fmt.Fprintf(w, "http://localhost:8080/%s", key)
-
+			fmt.Fprintf(w, "%s%s/%s", s.host, s.port, key)
 			return
 		}
 		log.Printf("Wow!!! %d-значный случайный код повторился! Совпадение? Не думаю!", keyLength)
@@ -68,9 +72,9 @@ func (s *Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 //
 // GET /{id}
 func (s *Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
-	key := strings.TrimPrefix(r.URL.Path, "/")
-	if len(key) != 8 {
-		log.Printf("shortener: DecodeURL: wrong key %v", key)
+	key, ok := mux.Vars(r)["id"]
+	if !ok || len(key) != 8 {
+		log.Printf("shortener: DecodeURL: wrong key '%v'", key)
 		http.Error(w, "Wrong key", http.StatusBadRequest)
 
 		return
