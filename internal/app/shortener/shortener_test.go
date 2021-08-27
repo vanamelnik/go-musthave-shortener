@@ -21,6 +21,7 @@ func TestShortener(t *testing.T) {
 		body       string
 		location   string
 	}
+
 	// Аргументы для GET тестов (ключ, по которому должен выдаться сохраненный URL).
 	// Первые два поля заполняются POST тестами.
 	args := []string{
