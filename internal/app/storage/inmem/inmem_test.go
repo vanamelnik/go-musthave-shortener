@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// TestGet тестирует функцию Get с использованием фейкового хранилища
+// TestGet тестирует функцию Get с использованием фейкового хранилища.
 func TestGet(t *testing.T) {
 	db := DB{
 		repo: map[string]string{
@@ -122,7 +122,7 @@ func TestInmem(t *testing.T) {
 			if tc.action == "get" || tc.action == "both" {
 				url, err := d.Get(tc.args.key)
 				if (err != nil) != tc.wantErrGet {
-					t.Fatalf("DB.Get() error = %v, wantErr %v", err, tc.wantErrGet)
+					t.Errorf("DB.Get() error = %v, wantErr %v", err, tc.wantErrGet)
 				}
 				if url != tc.args.url && err == nil {
 					t.Errorf("DB.Get() Expected url = %v, got %v", tc.args.url, url)

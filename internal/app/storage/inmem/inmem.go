@@ -9,14 +9,14 @@ import (
 
 var _ storage.Storage = (*DB)(nil)
 
-// DB - реализация интерфейса DB c thread-safe inmemory хранилищем (map с RW Mutex)
+// DB - реализация интерфейса DB c thread-safe inmemory хранилищем (map с RW Mutex).
 type DB struct {
 	sync.RWMutex
 
 	repo map[string]string // [key]url
 }
 
-// New инициализирует структуру in-memory хранилища
+// New инициализирует структуру in-memory хранилища.
 func NewDB() *DB {
 	return &DB{
 		repo: make(map[string]string),

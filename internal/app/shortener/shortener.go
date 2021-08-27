@@ -23,7 +23,7 @@ type Shortener struct {
 	host string
 }
 
-// NewShortener инициализирует новую структуру Shortener с использованием заданного хранилища
+// NewShortener инициализирует новую структуру Shortener с использованием заданного хранилища.
 func NewShortener(host, port string, db storage.Storage) *Shortener {
 	return &Shortener{
 		port: port,
