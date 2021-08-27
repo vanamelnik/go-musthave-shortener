@@ -118,7 +118,7 @@ func TestInmem(t *testing.T) {
 			} else if tc.action == "get" || tc.action == "both" {
 				url, err := d.Get(tc.args.key)
 				if (err != nil) != tc.wantErrGet {
-					t.Fatalf("DB.Get() error = %v, wantErr %v", err, tc.wantErrGet)
+					t.Errorf("DB.Get() error = %v, wantErr %v", err, tc.wantErrGet)
 				}
 				if url != tc.args.url && err == nil {
 					t.Errorf("DB.Get() Expected url = %v, got %v", tc.args.url, url)

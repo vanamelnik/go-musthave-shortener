@@ -19,7 +19,7 @@ func TestShortener(t *testing.T) {
 		body       string
 		location   string
 	}
-	// Аргументы для GET тестов. Первые два поля заполняются POST тестами
+	// Аргументы для GET тестов. Первые два поля заполняются POST тестами.
 	args := []string{
 		"",            // заполняется POST тестом №1
 		"",            // заполняется POST тестом №2
