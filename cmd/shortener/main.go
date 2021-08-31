@@ -27,6 +27,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/{id}", s.DecodeURL).Methods(http.MethodGet)
 	router.HandleFunc("/", s.ShortenURL).Methods(http.MethodPost)
+	router.HandleFunc("/api/shorten", s.APIShortenURL).Methods(http.MethodPost)
 	server := http.Server{
 		Addr:    port,
 		Handler: router,

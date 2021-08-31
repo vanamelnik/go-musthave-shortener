@@ -1,6 +1,7 @@
 package shortener
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -32,11 +33,46 @@ func NewShortener(host, port string, db storage.Storage) *Shortener {
 	}
 }
 
+// APIShortenURL принимает в теле запроса JSON-объект в формате {"url": "<some_url>"} и
+// возвращает в ответе объект {"result": "<shorten_url>"}
+//
+// POST /api/shorten
+func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
+	type Request struct {
+		URL string `json:"url,omitempty"`
+	}
+	type Result struct {
+		Result string `json:"result,omitempty"`
+	}
+	urlReq := Request{}
+	dec := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+	if err := dec.Decode(&urlReq); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		log.Printf("APIShortenURL: %v", err)
+
+		return
+	}
+	shortURL, err := s.shortenURL(w, urlReq.URL)
+	if err != nil {
+		http.Error(w, "Wrong URL", http.StatusBadRequest)
+		log.Printf("APIShortenURL: %v", err)
+	}
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	enc := json.NewEncoder(w)
+	err = enc.Encode(&Result{Result: shortURL})
+	if err != nil {
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+		log.Printf("APIShortHandler: %v", err)
+	}
+}
+
 // ShortenURL принимает в теле запроса URL, генерирует для него рандомный ключ, производит проверку его уникальности,
 // сохраняет его в БД и возвращает строку сокращенного url в теле ответа.
 //
 // POST /
-func (s *Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
+func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -45,12 +81,22 @@ func (s *Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	url, err := url.Parse(string(body))
-	if url.Host == "" || err != nil {
-		log.Println("shortener: no url in request")
+	shortUrl, err := s.shortenURL(w, string(body))
+	if err != nil {
 		http.Error(w, "Wrong url", http.StatusBadRequest)
+		log.Printf("shortener: %v", err)
 
 		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	// nolint:errcheck
+	w.Write([]byte(shortUrl))
+}
+func (s Shortener) shortenURL(w http.ResponseWriter, u string) (shortURL string, retErr error) {
+	url, err := checkURL(u)
+	if err != nil {
+
+		return "", err
 	}
 	// цикл проверки уникальности
 	for {
@@ -58,20 +104,19 @@ func (s *Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		if _, err := s.db.Get(key); err != nil {
 			// nolint:errcheck
 			s.db.Store(key, url.String()) // не проверяем ошибку, т.к. уникальность ключа только что проверена.
-			log.Printf("shortener: ShortenURL: created a token %v for %v", key, url)
-			w.WriteHeader(http.StatusCreated)
-			fmt.Fprintf(w, "%s%s/%s", s.host, s.port, key)
-			return
+			log.Printf("[INF]shortener: ShortenURL: created a token %v for %v", key, url)
+			shortURL = fmt.Sprintf("%s%s/%s", s.host, s.port, key)
+
+			return shortURL, nil
 		}
 		log.Printf("Wow!!! %d-значный случайный код повторился! Совпадение? Не думаю!", keyLength)
 	}
-
 }
 
 // DecodeURL принимает короткий параметр и производит редирект на изначальный url с кодом 307.
 //
 // GET /{id}
-func (s *Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
+func (s Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
 	key, ok := mux.Vars(r)["id"]
 	if !ok || len(key) != 8 {
 		log.Printf("shortener: DecodeURL: wrong key '%v'", key)
@@ -100,4 +145,19 @@ func generateKey() string {
 	}
 
 	return string(buf)
+}
+
+// checkURL проверяет входящую строку, является ли она URL с полями scheme и host
+func checkURL(u string) (*url.URL, error) {
+	url, err := url.Parse(u)
+	if err != nil {
+
+		return nil, err
+	}
+	if url.Host == "" || url.Scheme == "" {
+
+		return nil, fmt.Errorf("wrong URL: %s", u)
+	}
+
+	return url, nil
 }
