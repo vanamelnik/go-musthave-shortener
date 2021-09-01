@@ -83,7 +83,7 @@ func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	shortUrl, err := s.shortenURL(w, string(body))
+	shortURL, err := s.shortenURL(w, string(body))
 	if err != nil {
 		http.Error(w, "Wrong URL", http.StatusBadRequest)
 		log.Printf("shortener: %v", err)
@@ -92,7 +92,7 @@ func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusCreated)
 	// nolint:errcheck
-	w.Write([]byte(shortUrl))
+	w.Write([]byte(shortURL))
 }
 func (s Shortener) shortenURL(w http.ResponseWriter, u string) (shortURL string, retErr error) {
 	url, err := checkURL(u)

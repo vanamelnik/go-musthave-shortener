@@ -232,6 +232,7 @@ func TestAPIShorten(t *testing.T) {
 			h.ServeHTTP(w, r)
 
 			res := w.Result()
+			defer res.Body.Close()
 			assert.Equal(t, tc.want.statusCode, res.StatusCode)
 			assert.Equal(t, tc.want.contentType, res.Header.Get("Content-Type"))
 			body, err := io.ReadAll(res.Body)
