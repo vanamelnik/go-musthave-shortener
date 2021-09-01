@@ -48,15 +48,17 @@ func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(r.Body)
 	defer r.Body.Close()
 	if err := dec.Decode(&urlReq); err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
 		log.Printf("APIShortenURL: %v", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
 
 		return
 	}
 	shortURL, err := s.shortenURL(w, urlReq.URL)
 	if err != nil {
-		http.Error(w, "Wrong URL", http.StatusBadRequest)
 		log.Printf("APIShortenURL: %v", err)
+		http.Error(w, "Wrong URL", http.StatusBadRequest)
+
+		return
 	}
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -83,7 +85,7 @@ func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 	shortUrl, err := s.shortenURL(w, string(body))
 	if err != nil {
-		http.Error(w, "Wrong url", http.StatusBadRequest)
+		http.Error(w, "Wrong URL", http.StatusBadRequest)
 		log.Printf("shortener: %v", err)
 
 		return
