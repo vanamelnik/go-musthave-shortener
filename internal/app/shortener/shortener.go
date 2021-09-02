@@ -19,17 +19,17 @@ const keyLength = 8
 
 // Shortener - сервис создания, хранения и получения коротких URL адресов.
 type Shortener struct {
-	db   storage.Storage
-	port string
-	host string
+	db         storage.Storage
+	serverAddr string
+	baseURL    string
 }
 
 // NewShortener инициализирует новую структуру Shortener с использованием заданного хранилища.
-func NewShortener(host, port string, db storage.Storage) *Shortener {
+func NewShortener(serverAddr, baseURL string, db storage.Storage) *Shortener {
 	return &Shortener{
-		port: port,
-		host: host,
-		db:   db,
+		serverAddr: serverAddr,
+		baseURL:    baseURL,
+		db:         db,
 	}
 }
 
@@ -107,7 +107,7 @@ func (s Shortener) shortenURL(w http.ResponseWriter, u string) (shortURL string,
 			// nolint:errcheck
 			s.db.Store(key, url.String()) // не проверяем ошибку, т.к. уникальность ключа только что проверена.
 			log.Printf("[INF]shortener: ShortenURL: created a token %v for %v", key, url)
-			shortURL = fmt.Sprintf("%s%s/%s", s.host, s.port, key)
+			shortURL = fmt.Sprintf("%s%s", s.baseURL, key)
 
 			return shortURL, nil
 		}

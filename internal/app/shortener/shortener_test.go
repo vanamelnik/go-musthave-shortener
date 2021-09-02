@@ -116,7 +116,7 @@ func TestShortener(t *testing.T) {
 		},
 	}
 	db := inmem.NewDB()
-	s := shortener.NewShortener("http://localhost", ":8080", db)
+	s := shortener.NewShortener("http://localhost:8080/", "http://localhost:8080/", db)
 
 	// запускаем тесты POST
 	for _, tc := range testsPost {
@@ -223,7 +223,7 @@ func TestAPIShorten(t *testing.T) {
 			},
 		},
 	}
-	s := shortener.NewShortener("http://localhost", ":8080", &MockStorage{})
+	s := shortener.NewShortener("http://localhost:8080/", "http://localhost:8080/", &MockStorage{})
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest("POST", "/api/shorten", strings.NewReader(tc.body))

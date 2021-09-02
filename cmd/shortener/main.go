@@ -15,21 +15,26 @@ import (
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
 )
 
-const (
-	host = "http://localhost"
-	port = ":8080"
-)
-
 func main() {
+	serverAddr, ok := os.LookupEnv("SERVER_ADDRESS")
+	if !ok {
+		serverAddr = "http://localhost:8080/"
+	}
+	baseURL, ok := os.LookupEnv("BASE_URL")
+	if !ok {
+		baseURL = "http://localhost:8080/"
+	}
+	log.Printf("Server Adress is %s", serverAddr)
+	log.Printf("Base URL is %s", baseURL)
 	rand.Seed(time.Now().UnixNano())
 	db := inmem.NewDB()
-	s := shortener.NewShortener(host, port, db)
+	s := shortener.NewShortener(serverAddr, baseURL, db)
 	router := mux.NewRouter()
 	router.HandleFunc("/{id}", s.DecodeURL).Methods(http.MethodGet)
 	router.HandleFunc("/", s.ShortenURL).Methods(http.MethodPost)
 	router.HandleFunc("/api/shorten", s.APIShortenURL).Methods(http.MethodPost)
 	server := http.Server{
-		Addr:    port,
+		Addr:    ":8080",
 		Handler: router,
 	}
 
