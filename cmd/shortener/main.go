@@ -27,27 +27,34 @@ import (
   timeout 10 sh -c "until lsof -i:$APP_PORT; do sleep 1s; done"
 */
 
-type config struct {
-	appPort     string
-	appBaseHost string
-	appBaseUrl  string
-	srvAddr     string
-}
+// type config struct {
+// 	appPort     string
+// 	appBaseHost string
+// 	appBaseURL  string
+// 	srvAddr     string
+// }
 
 func main() {
-	// env:default
-	cfgEnv := map[string]string{
-		"APP_PORT":       "8080",
-		"APP_BASE_HOST":  "localhost",
-		"APP_BASE_URL":   "http://localhost:8080",
-		"SERVER_ADDRESS": ":8080",
+	// cfgEnv := map[string]string{
+	// 	"APP_PORT":       "8080",
+	// 	"APP_BASE_HOST":  "localhost",
+	// 	"APP_BASE_URL":   "http://localhost:8080",
+	// 	"SERVER_ADDRESS": ":8080",
+	// }
+	// cfg := getConfig(cfgEnv)
+	baseURL := "http://lovalhost:8080"
+	serverAddress := ":8080"
+	// log.Printf("Server configuration: %+v", cfg)
+	if env, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
+		serverAddress = env
 	}
-	cfg := getConfig(cfgEnv)
-	log.Printf("Server configuration: %+v", cfg)
+	if env, ok := os.LookupEnv("BASE_URL"); ok {
+		baseURL = env
+	}
 
 	rand.Seed(time.Now().UnixNano())
 	db := inmem.NewDB()
-	s := shortener.NewShortener(cfg.appBaseUrl, db)
+	s := shortener.NewShortener(baseURL, db)
 
 	router := mux.NewRouter()
 	router.HandleFunc("/{id}", s.DecodeURL).Methods(http.MethodGet)
@@ -55,7 +62,7 @@ func main() {
 	router.HandleFunc("/api/shorten", s.APIShortenURL).Methods(http.MethodPost)
 
 	server := http.Server{
-		Addr:    cfg.srvAddr,
+		Addr:    serverAddress,
 		Handler: router,
 	}
 
@@ -65,7 +72,7 @@ func main() {
 	go func() {
 		log.Println(server.ListenAndServe())
 	}()
-	log.Println("Shortener server is listening at " + cfg.srvAddr)
+	log.Println("Shortener server is listening at " + serverAddress)
 
 	<-sigint
 	fmt.Print("Shutting down... ")
@@ -74,16 +81,20 @@ func main() {
 	}
 }
 
-func getConfig(env map[string]string) *config {
-	for v := range env {
-		if envVal, ok := os.LookupEnv(v); ok {
-			env[v] = envVal // изменить значение по умолчанию на значение переменной окружения
-		}
-	}
-	return &config{
-		appPort:     env["APP_PORT"],
-		appBaseHost: env["APP_BASE_HOST"],
-		appBaseUrl:  env["APP_BASE_URL"],
-		srvAddr:     env["SERVER_ADDRESS"],
-	}
-}
+// func getConfig(env map[string]string) *config {
+// 	log.Println(os.Environ())
+// 	for v := range env {
+// 		if envVal, ok := os.LookupEnv(v); ok {
+// 			env[v] = envVal // изменить значение по умолчанию на значение переменной окружения
+// 		} else {
+// 			log.Println(v + " not ok!")
+// 		}
+// 		log.Printf("%s=%s", v, env[v])
+// 	}
+// 	return &config{
+// 		appPort:     env["APP_PORT"],
+// 		appBaseHost: env["APP_BASE_HOST"],
+// 		appBaseURL:  env["APP_BASE_URL"],
+// 		srvAddr:     env["SERVER_ADDRESS"],
+// 	}
+// }
