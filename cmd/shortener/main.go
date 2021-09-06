@@ -42,7 +42,7 @@ func main() {
 	// 	"SERVER_ADDRESS": ":8080",
 	// }
 	// cfg := getConfig(cfgEnv)
-	baseURL := "http://lovalhost:8080"
+	baseURL := "http://localhost:8080"
 	serverAddress := ":8080"
 	// log.Printf("Server configuration: %+v", cfg)
 	if env, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
