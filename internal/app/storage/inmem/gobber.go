@@ -35,7 +35,6 @@ func (db *DB) flush() error {
 	db.Lock()
 	defer db.Unlock()
 	if !db.isChanged {
-		// log.Println("[INF] gobber: no changes - no flush")
 
 		return nil
 	}
