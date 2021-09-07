@@ -2,6 +2,7 @@ package inmem
 
 import (
 	"testing"
+	"time"
 )
 
 // TestGet тестирует функцию Get с использованием фейкового хранилища.
@@ -111,7 +112,7 @@ func TestInmem(t *testing.T) {
 			wantErrGet:   true,
 		},
 	}
-	d := NewDB()
+	d := NewDB("tmp.db", time.Hour)
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.action == "store" || tc.action == "both" {

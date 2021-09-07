@@ -37,10 +37,10 @@ func NewShortener(baseURL string, db storage.Storage) *Shortener {
 // POST /api/shorten
 func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 	type Request struct {
-		URL string `json:"url,omitempty"`
+		URL string `json:"url"`
 	}
 	type Result struct {
-		Result string `json:"result,omitempty"`
+		Result string `json:"result"`
 	}
 	urlReq := Request{}
 	dec := json.NewDecoder(r.Body)
@@ -104,7 +104,7 @@ func (s Shortener) shortenURL(w http.ResponseWriter, u string) (shortURL string,
 		if _, err := s.db.Get(key); err != nil {
 			// nolint:errcheck
 			s.db.Store(key, url.String()) // не проверяем ошибку, т.к. уникальность ключа только что проверена.
-			log.Printf("[INF]shortener: ShortenURL: created a token %v for %v", key, url)
+			log.Printf("[INF] shortener: ShortenURL: created a token %v for %v", key, url)
 			shortURL = fmt.Sprintf("%s/%s", s.BaseURL, key)
 
 			return shortURL, nil

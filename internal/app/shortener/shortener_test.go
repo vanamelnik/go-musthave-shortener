@@ -115,7 +115,8 @@ func TestShortener(t *testing.T) {
 			},
 		},
 	}
-	db := inmem.NewDB()
+	db := inmem.NewDB("tmp.db", time.Hour)
+	defer db.Close()
 	s := shortener.NewShortener("http://localhost:8080", db)
 
 	// запускаем тесты POST
