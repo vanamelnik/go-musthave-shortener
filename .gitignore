@@ -22,5 +22,8 @@ vendor/
 .idea
 .vscode
 
+# Temporary files
+tmp/
+
 # File storage
 *.gob

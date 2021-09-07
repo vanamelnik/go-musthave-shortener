@@ -58,23 +58,23 @@ func (db *DB) Close() {
 
 // Store сохраняет в репозитории пару ключ:url.
 // если ключ уже используется, выдается ошибка.
-func (d *DB) Store(key, url string) error {
-	if d.Has(key) {
+func (db *DB) Store(key, url string) error {
+	if db.Has(key) {
 		return fmt.Errorf("DB: the key %s already in use", key)
 	}
-	d.Lock()
-	defer d.Unlock()
-	d.repo[key] = url
-	d.isChanged = true
+	db.Lock()
+	defer db.Unlock()
+	db.repo[key] = url
+	db.isChanged = true
 
 	return nil
 }
 
 // Has проверяет наличие в базе записи с ключом key.
-func (d *DB) Has(key string) bool {
-	d.RLock()
-	defer d.RUnlock()
-	_, ok := d.repo[key]
+func (db *DB) Has(key string) bool {
+	db.RLock()
+	defer db.RUnlock()
+	_, ok := db.repo[key]
 
 	return ok
 }

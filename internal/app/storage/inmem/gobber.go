@@ -43,7 +43,7 @@ func (db *DB) gobber() {
 			}
 			log.Println("[INF] gobber stopped")
 
-			break
+			return
 		}
 	}
 }

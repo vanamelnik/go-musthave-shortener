@@ -15,26 +15,24 @@ import (
 )
 
 const (
-	flushInterval = 30 * time.Second
-	fileName      = "storage.gob"
+	flushInterval = 10 * time.Second
+	fileName      = "localhost.gob"
 )
 
 type config struct {
-	baseURL         string
-	srvAddr         string
-	fileStoragePath string
-
+	baseURL       string
+	srvAddr       string
 	fileName      string
 	flushInterval time.Duration
 }
 
 func main() {
 	cfgEnv := map[string]string{
-		"BASE_URL":          "http://localhost:8080",
-		"SERVER_ADDRESS":    ":8080",
-		"FILE_STORAGE_PATH": "./",
+		"BASE_URL":             "http://localhost:8080",
+		"SERVER_ADDRESS":       ":8080",
+		"PERSISTENT_FILE_PATH": "./" + fileName,
 	}
-	cfg := getConfig(cfgEnv, fileName, flushInterval)
+	cfg := getConfig(cfgEnv, flushInterval)
 	log.Printf("Server configuration: %+v", *cfg)
 
 	rand.Seed(time.Now().UnixNano())
@@ -69,17 +67,16 @@ func main() {
 	}
 }
 
-func getConfig(env map[string]string, fileName string, flushInterval time.Duration) *config {
+func getConfig(env map[string]string, flushInterval time.Duration) *config {
 	for v := range env {
 		if envVal, ok := os.LookupEnv(v); ok {
 			env[v] = envVal // изменить значение по умолчанию на значение переменной окружения
 		}
 	}
 	return &config{
-		baseURL:         env["BASE_URL"],
-		srvAddr:         env["SERVER_ADDRESS"],
-		fileStoragePath: env["FILE_STORAGE_PATH"],
-		fileName:        env["FILE_STORAGE_PATH"] + fileName,
-		flushInterval:   flushInterval,
+		baseURL:       env["BASE_URL"],
+		srvAddr:       env["SERVER_ADDRESS"],
+		fileName:      env["PERSISTENT_FILE_PATH"],
+		flushInterval: flushInterval,
 	}
 }
