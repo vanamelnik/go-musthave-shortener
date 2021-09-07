@@ -16,7 +16,7 @@ import (
 
 const (
 	flushInterval = 10 * time.Second
-	fileName      = "localhost.gob"
+	fileName      = "localhost.db"
 )
 
 type config struct {
@@ -30,7 +30,7 @@ func main() {
 	cfgEnv := map[string]string{
 		"BASE_URL":          "http://localhost:8080",
 		"SERVER_ADDRESS":    ":8080",
-		"FILE_STORAGE_PATH": "./" + fileName,
+		"FILE_STORAGE_PATH": fileName,
 	}
 	cfg := getConfig(cfgEnv, flushInterval)
 	log.Printf("Server configuration: %+v", *cfg)

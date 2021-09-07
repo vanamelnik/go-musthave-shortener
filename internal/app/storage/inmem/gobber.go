@@ -35,11 +35,11 @@ func (db *DB) flush() error {
 	db.Lock()
 	defer db.Unlock()
 	if !db.isChanged {
-		log.Println("[INF] gobber: no changes - no flush")
+		// log.Println("[INF] gobber: no changes - no flush")
 
 		return nil
 	}
-	file, err := os.OpenFile(db.fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0777)
+	file, err := os.OpenFile(db.fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0777) // переписываем весь файл
 	if err != nil {
 
 		return err

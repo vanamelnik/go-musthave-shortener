@@ -27,3 +27,4 @@ tmp/
 
 # File storage
 *.gob
+*.db
