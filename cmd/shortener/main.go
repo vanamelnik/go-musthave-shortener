@@ -28,9 +28,9 @@ type config struct {
 
 func main() {
 	cfgEnv := map[string]string{
-		"BASE_URL":             "http://localhost:8080",
-		"SERVER_ADDRESS":       ":8080",
-		"PERSISTENT_FILE_PATH": "./" + fileName,
+		"BASE_URL":          "http://localhost:8080",
+		"SERVER_ADDRESS":    ":8080",
+		"FILE_STORAGE_PATH": "./" + fileName,
 	}
 	cfg := getConfig(cfgEnv, flushInterval)
 	log.Printf("Server configuration: %+v", *cfg)
@@ -76,7 +76,7 @@ func getConfig(env map[string]string, flushInterval time.Duration) *config {
 	return &config{
 		baseURL:       env["BASE_URL"],
 		srvAddr:       env["SERVER_ADDRESS"],
-		fileName:      env["PERSISTENT_FILE_PATH"],
+		fileName:      env["FILE_STORAGE_PATH"],
 		flushInterval: flushInterval,
 	}
 }

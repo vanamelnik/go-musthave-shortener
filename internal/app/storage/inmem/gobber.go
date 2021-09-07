@@ -11,6 +11,7 @@ import (
 func readRepo(fileName string) (map[string]string, error) {
 	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0777)
 	if err != nil {
+		log.Printf("readRepo: %v", err)
 
 		return nil, err
 	}
