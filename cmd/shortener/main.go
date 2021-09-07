@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"math/rand"
 	"net/http"
@@ -16,7 +17,10 @@ import (
 
 const (
 	flushInterval = 10 * time.Second
-	fileName      = "localhost.db"
+
+	fileNameDefault = "localhost.db"
+	baseURLDefault  = "http://localhost:8080"
+	srvAddrDefault  = ":8080"
 )
 
 type config struct {
@@ -27,12 +31,16 @@ type config struct {
 }
 
 func main() {
+	// сперва парсим переменные окружения, т.к. флаги имеют преимущество и
+	// в дальнейшем смогут перекрыть их.
 	cfgEnv := map[string]string{
-		"BASE_URL":          "http://localhost:8080",
-		"SERVER_ADDRESS":    ":8080",
-		"FILE_STORAGE_PATH": fileName,
+		"BASE_URL":          baseURLDefault,
+		"SERVER_ADDRESS":    srvAddrDefault,
+		"FILE_STORAGE_PATH": fileNameDefault,
 	}
 	cfg := getConfig(cfgEnv, flushInterval)
+	parseFlags(cfg)
+
 	log.Printf("Server configuration: %+v", *cfg)
 
 	rand.Seed(time.Now().UnixNano())
@@ -70,16 +78,43 @@ func main() {
 	}
 }
 
+// getConfig получает на вход map <имя переменной окружения> : <значение по умолчанию>, затем проверяет, не установлена
+// ли каждая из этих переменных, и меняет значение на установленную. Функция возвращает структуру config, сформированную
+// из скорректированной map.
 func getConfig(env map[string]string, flushInterval time.Duration) *config {
 	for v := range env {
 		if envVal, ok := os.LookupEnv(v); ok {
 			env[v] = envVal // изменить значение по умолчанию на значение переменной окружения
 		}
 	}
+
 	return &config{
 		baseURL:       env["BASE_URL"],
 		srvAddr:       env["SERVER_ADDRESS"],
 		fileName:      env["FILE_STORAGE_PATH"],
 		flushInterval: flushInterval,
 	}
+}
+
+// parseFlags применяет флаги к конфигурации сервиса.
+// Если флаги не установлены, в конфигурации сохраняются старые значения
+// (заданные переменными окружения либо значения по умолчанию).
+func parseFlags(cfg *config) {
+	_ = flag.String("a", srvAddrDefault, "Server address")
+	_ = flag.String("b", baseURLDefault, "Base URL")
+	_ = flag.String("f", fileNameDefault, "File storage path")
+	flag.Parse()
+
+	// поскольку дефолтные значения флагов не должны перекрывать переменные окружения,
+	// мы добавим в конфигурацию только те флаги, которые пользователь установил явно.
+	flag.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "a":
+			cfg.srvAddr = f.Value.String()
+		case "b":
+			cfg.baseURL = f.Value.String()
+		case "f":
+			cfg.fileName = f.Value.String()
+		}
+	})
 }

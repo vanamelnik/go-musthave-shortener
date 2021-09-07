@@ -8,7 +8,7 @@ import (
 )
 
 // initRepo считывает и декодирует данные хранилища из файла в формате gob.
-// Если файл не найден - он создается функцией createRepoFile
+// Если файл не найден - он создается функцией createRepoFile.
 func initRepo(fileName string) (map[string]string, error) {
 	if _, err := os.Stat(fileName); err != nil {
 		if os.IsNotExist(err) {
@@ -21,7 +21,7 @@ func initRepo(fileName string) (map[string]string, error) {
 	file, err := os.OpenFile(fileName, os.O_RDONLY, 0777)
 	if err != nil {
 
-		return nil, err
+		return nil, fmt.Errorf("initRepo: %v", err)
 	}
 	dec := gob.NewDecoder(file)
 	repo := make(map[string]string)
@@ -34,8 +34,8 @@ func initRepo(fileName string) (map[string]string, error) {
 	return repo, nil
 }
 
-// createRepoFile создает файл и записывает в него сериализованную пустую map
-
+// createRepoFile создает файл и записывает в него сериализованную пустую map (иначе автотест
+// ругается на пустой файл).
 func createRepoFile(fileName string) (map[string]string, error) {
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0777)
 	if err != nil {
