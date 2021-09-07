@@ -9,7 +9,7 @@ import (
 
 // readRepo считывает и декодирует данные хранилища из файла в формате gob.
 func readRepo(fileName string) (map[string]string, error) {
-	file, err := os.OpenFile(fileName, os.O_RDONLY, 0777)
+	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0777)
 	if err != nil {
 
 		return nil, err

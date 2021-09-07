@@ -81,10 +81,10 @@ func (db *DB) Has(key string) bool {
 
 // Get извлекает из хранилища длинный url по ключу.
 // Если ключа в базе нет, возвращается ошибка.
-func (d *DB) Get(key string) (string, error) {
-	d.RLock()
-	defer d.RUnlock()
-	url, ok := d.repo[key]
+func (db *DB) Get(key string) (string, error) {
+	db.RLock()
+	defer db.RUnlock()
+	url, ok := db.repo[key]
 	if !ok {
 		return "", fmt.Errorf("DB: key %s not found", key)
 	}
