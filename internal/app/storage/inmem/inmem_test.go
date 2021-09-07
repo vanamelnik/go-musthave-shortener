@@ -3,6 +3,8 @@ package inmem
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TestGet тестирует функцию Get с использованием фейкового хранилища.
@@ -112,7 +114,8 @@ func TestInmem(t *testing.T) {
 			wantErrGet:   true,
 		},
 	}
-	d := NewDB("tmp.db", time.Hour)
+	d, err := NewDB("tmp.db", time.Hour)
+	require.NoError(t, err)
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.action == "store" || tc.action == "both" {

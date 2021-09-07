@@ -115,7 +115,8 @@ func TestShortener(t *testing.T) {
 			},
 		},
 	}
-	db := inmem.NewDB("tmp.db", time.Hour)
+	db, err := inmem.NewDB("tmp.db", time.Hour)
+	require.NoError(t, err)
 	defer db.Close()
 	s := shortener.NewShortener("http://localhost:8080", db)
 

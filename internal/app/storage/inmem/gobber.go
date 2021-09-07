@@ -7,25 +7,6 @@ import (
 	"time"
 )
 
-// readRepo считывает и декодирует данные хранилища из файла в формате gob.
-func readRepo(fileName string) (map[string]string, error) {
-	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0777)
-	if err != nil {
-		log.Printf("readRepo: %v", err)
-
-		return nil, err
-	}
-	dec := gob.NewDecoder(file)
-	repo := make(map[string]string)
-	if err = dec.Decode(&repo); err != nil {
-
-		return nil, err
-	}
-	log.Printf("[INF] readRepo: successfully read repo from file %s", fileName)
-
-	return repo, nil
-}
-
 // gobber - сервис, сохраняющий данные in-memory хранилища в файл в формате gob с заданной периодичностью.
 // Сервис работает в своей горутине и завершается по сигналу из канала gobberStop.
 func (db *DB) gobber() {

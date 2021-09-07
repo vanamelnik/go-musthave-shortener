@@ -37,7 +37,10 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	db := inmem.NewDB(cfg.fileName, cfg.flushInterval)
+	db, err := inmem.NewDB(cfg.fileName, cfg.flushInterval)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	s := shortener.NewShortener(cfg.baseURL, db)
 

@@ -33,10 +33,11 @@ type DB struct {
 }
 
 // New инициализирует структуру in-memory хранилища.
-func NewDB(fileName string, interval time.Duration) *DB {
-	repo, err := readRepo(fileName)
+func NewDB(fileName string, interval time.Duration) (*DB, error) {
+	repo, err := initRepo(fileName)
 	if err != nil {
-		repo = make(map[string]string)
+
+		return nil, err
 	}
 
 	db := &DB{
@@ -49,7 +50,7 @@ func NewDB(fileName string, interval time.Duration) *DB {
 
 	go db.gobber()
 
-	return db
+	return db, nil
 }
 
 func (db *DB) Close() {
