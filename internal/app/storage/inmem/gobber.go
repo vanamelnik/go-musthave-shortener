@@ -20,9 +20,6 @@ func (db *DB) gobber() {
 				log.Printf("gobber: %v", err)
 			}
 		case <-db.gobberStop:
-			if err := db.flush(); err != nil {
-				log.Printf("gobber: %v", err)
-			}
 			log.Println("[INF] gobber stopped")
 
 			return

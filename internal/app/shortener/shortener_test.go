@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -115,9 +116,14 @@ func TestShortener(t *testing.T) {
 			},
 		},
 	}
+
 	db, err := inmem.NewDB("tmp.db", time.Hour)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() {
+		db.Close()
+		require.NoError(t, os.Remove("tmp.db"))
+	}()
+
 	s := shortener.NewShortener("http://localhost:8080", db)
 
 	// запускаем тесты POST

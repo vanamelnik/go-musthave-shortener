@@ -29,14 +29,13 @@ type DB struct {
 	// файл с данными необходимо обновить.
 	isChanged bool
 
-	gobberStop chan bool
+	gobberStop chan struct{}
 }
 
 // New инициализирует структуру in-memory хранилища.
 func NewDB(fileName string, interval time.Duration) (*DB, error) {
 	repo, err := initRepo(fileName)
 	if err != nil {
-
 		return nil, err
 	}
 
@@ -45,7 +44,7 @@ func NewDB(fileName string, interval time.Duration) (*DB, error) {
 		fileName:      fileName,
 		flushInterval: interval,
 		isChanged:     false,
-		gobberStop:    make(chan bool),
+		gobberStop:    make(chan struct{}),
 	}
 
 	go db.gobber()
@@ -54,7 +53,15 @@ func NewDB(fileName string, interval time.Duration) (*DB, error) {
 }
 
 func (db *DB) Close() {
-	db.gobberStop <- true
+	db.flush()
+
+	db.Lock()
+	defer db.Unlock()
+
+	if db.gobberStop != nil {
+		close(db.gobberStop)
+	}
+	db.gobberStop = nil
 }
 
 // Store сохраняет в репозитории пару ключ:url.

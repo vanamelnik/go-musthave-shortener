@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -30,13 +32,41 @@ type config struct {
 	flushInterval time.Duration
 }
 
+// validate проверяет конфигурацию и выдает ошибку, если обнаруживает пустые поля.
+func (cfg config) validate() error {
+	problems := make([]string, 0, 4)
+
+	if cfg.baseURL == "" {
+		problems = append(problems, "base URL")
+	}
+	if cfg.srvAddr == "" {
+		problems = append(problems, "server address")
+	}
+	if cfg.fileName == "" {
+		problems = append(problems, "storage file name")
+	}
+	if cfg.flushInterval == 0 {
+		problems = append(problems, "flushing interval")
+	}
+
+	if len(problems) != 0 {
+		errMsg := "Invalid config: " + strings.Join(problems, ", ") + " not set."
+
+		return errors.New(errMsg)
+	}
+
+	return nil
+}
+
 func main() {
-	cfg := getConfig(
-		withDefaults(),
+	cfg := newConfig(
 		withFlags(),
 		withEnv(),
 	)
-	log.Printf("Server configuration: %+v", *cfg)
+	if err := cfg.validate(); err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Server configuration: %+v", cfg)
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -44,6 +74,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer db.Close()
 
 	s := shortener.NewShortener(cfg.baseURL, db)
 
@@ -62,7 +93,6 @@ func main() {
 
 	go func() {
 		log.Println(server.ListenAndServe())
-		db.Close() // вопрос: через defer не получается сохранить данные (почему-то) - такой вариант приемлем?
 	}()
 	log.Println("Shortener server is listening at " + cfg.srvAddr)
 
@@ -73,28 +103,26 @@ func main() {
 	}
 }
 
-type fnConf func(*config)
+type configOption func(*config)
 
-func getConfig(opts ...fnConf) *config {
-	cfg := config{}
+// newConfig формирует конфигурацию из значений по умолчанию, затем опционально меняет
+// поля при помощи функций configOption.
+func newConfig(opts ...configOption) config {
+	cfg := config{
+		baseURL:       baseURLDefault,
+		srvAddr:       srvAddrDefault,
+		fileName:      fileNameDefault,
+		flushInterval: flushInterval,
+	}
 
 	for _, fn := range opts {
 		fn(&cfg)
 	}
 
-	return &cfg
+	return cfg
 }
 
-func withDefaults() fnConf {
-	return func(cfg *config) {
-		cfg.baseURL = baseURLDefault
-		cfg.srvAddr = srvAddrDefault
-		cfg.fileName = fileNameDefault
-		cfg.flushInterval = flushInterval
-	}
-}
-
-func withFlags() fnConf {
+func withFlags() configOption {
 	return func(cfg *config) {
 		flag.StringVar(&cfg.srvAddr, "a", srvAddrDefault, "Server address")
 		flag.StringVar(&cfg.baseURL, "b", baseURLDefault, "Base URL")
@@ -103,7 +131,7 @@ func withFlags() fnConf {
 	}
 }
 
-func withEnv() fnConf {
+func withEnv() configOption {
 	return func(cfg *config) {
 		env := map[string]*string{
 			"BASE_URL":          &cfg.baseURL,
