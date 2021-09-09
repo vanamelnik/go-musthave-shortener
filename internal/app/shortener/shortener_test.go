@@ -1,21 +1,27 @@
 package shortener_test
 
 import (
+	"errors"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
+	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
 )
 
 // TestShortener - комплексный тест, прогоняющий все виды запросов к inmemory хранилищу.
 func TestShortener(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
 	type want struct {
 		statusCode int
 		body       string
@@ -59,7 +65,7 @@ func TestShortener(t *testing.T) {
 			body: "",
 			want: want{
 				statusCode: http.StatusBadRequest,
-				body:       "Wrong url",
+				body:       "Wrong URL",
 			},
 			saveArg: nil,
 		},
@@ -110,8 +116,15 @@ func TestShortener(t *testing.T) {
 			},
 		},
 	}
-	db := inmem.NewDB()
-	s := shortener.NewShortener("http://localhost", ":8080", db)
+
+	db, err := inmem.NewDB("tmp.db", time.Hour)
+	require.NoError(t, err)
+	defer func() {
+		db.Close()
+		require.NoError(t, os.Remove("tmp.db"))
+	}()
+
+	s := shortener.NewShortener("http://localhost:8080", db)
 
 	// запускаем тесты POST
 	for _, tc := range testsPost {
@@ -131,7 +144,7 @@ func TestShortener(t *testing.T) {
 				t.Errorf("Expected return body has prefix '%v', got '%v'", tc.want.body, url)
 			}
 			if tc.saveArg != nil {
-				*tc.saveArg = strings.TrimPrefix(url, "http://localhost:8080/")
+				*tc.saveArg = strings.TrimPrefix(url, s.BaseURL+"/")
 			}
 		})
 	}
@@ -159,6 +172,83 @@ func TestShortener(t *testing.T) {
 				assert.Equal(t, tc.want.location, location)
 			} else {
 				assert.Equal(t, tc.want.body, body)
+			}
+		})
+	}
+}
+
+var _ storage.Storage = (*MockStorage)(nil)
+
+type MockStorage struct {
+}
+
+func (ms MockStorage) Store(key, url string) error {
+	return nil // имитирует сохранение ключа в базе, ошибок быть не может
+}
+
+func (ms MockStorage) Get(key string) (string, error) {
+	return "", errors.New("Mock error") // Ошибка - элемент не найден (используется в цикле проверки уникальности)
+}
+
+func TestAPIShorten(t *testing.T) {
+	rand.Seed(1)
+	const fakeKey = "fpllngzi" // Первый ключ, генерируемый при rand.Seed(1)
+	type want struct {
+		contentType string
+		body        string
+		statusCode  int
+	}
+	testCases := []struct {
+		name string
+		body string
+		want want
+	}{
+		{
+			name: "#1 Valid request",
+			body: `{"url" : "http://shetube.com"}`,
+			want: want{
+				contentType: "application/json",
+				body:        `{"result":"http://localhost:8080/` + fakeKey + `"}`,
+				statusCode:  http.StatusCreated,
+			},
+		},
+		{
+			name: "#2 Invalid url",
+			body: `{"url" : "hetube.com"}`,
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				body:        "Wrong URL",
+				statusCode:  http.StatusBadRequest,
+			},
+		},
+		{
+			name: "#3 Invalid json",
+			body: "{url : http://wetube.com}",
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				body:        "Bad request",
+				statusCode:  http.StatusBadRequest,
+			},
+		},
+	}
+	s := shortener.NewShortener("http://localhost:8080", &MockStorage{})
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := httptest.NewRequest("POST", "/api/shorten", strings.NewReader(tc.body))
+			w := httptest.NewRecorder()
+			h := http.HandlerFunc(s.APIShortenURL)
+			h.ServeHTTP(w, r)
+
+			res := w.Result()
+			defer res.Body.Close()
+			assert.Equal(t, tc.want.statusCode, res.StatusCode)
+			assert.Equal(t, tc.want.contentType, res.Header.Get("Content-Type"))
+			body, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
+			if res.StatusCode == http.StatusCreated {
+				assert.JSONEq(t, tc.want.body, string(body))
+			} else {
+				assert.Equal(t, tc.want.body, strings.TrimSpace(string(body)))
 			}
 		})
 	}

@@ -1,6 +1,7 @@
 package shortener
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -18,17 +19,52 @@ const keyLength = 8
 
 // Shortener - сервис создания, хранения и получения коротких URL адресов.
 type Shortener struct {
-	db   storage.Storage
-	port string
-	host string
+	db      storage.Storage
+	BaseURL string
 }
 
 // NewShortener инициализирует новую структуру Shortener с использованием заданного хранилища.
-func NewShortener(host, port string, db storage.Storage) *Shortener {
+func NewShortener(baseURL string, db storage.Storage) *Shortener {
 	return &Shortener{
-		port: port,
-		host: host,
-		db:   db,
+		BaseURL: baseURL,
+		db:      db,
+	}
+}
+
+// APIShortenURL принимает в теле запроса JSON-объект в формате {"url": "<some_url>"} и
+// возвращает в ответе объект {"result": "<shorten_url>"}
+//
+// POST /api/shorten
+func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
+	type Request struct {
+		URL string `json:"url"`
+	}
+	type Result struct {
+		Result string `json:"result"`
+	}
+	urlReq := Request{}
+	dec := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+	if err := dec.Decode(&urlReq); err != nil {
+		log.Printf("APIShortenURL: %v", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+
+		return
+	}
+	shortURL, err := s.shortenURL(w, urlReq.URL)
+	if err != nil {
+		log.Printf("APIShortenURL: %v", err)
+		http.Error(w, "Wrong URL", http.StatusBadRequest)
+
+		return
+	}
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	enc := json.NewEncoder(w)
+	err = enc.Encode(&Result{Result: shortURL})
+	if err != nil {
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+		log.Printf("APIShortHandler: %v", err)
 	}
 }
 
@@ -36,7 +72,7 @@ func NewShortener(host, port string, db storage.Storage) *Shortener {
 // сохраняет его в БД и возвращает строку сокращенного url в теле ответа.
 //
 // POST /
-func (s *Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
+func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -45,12 +81,22 @@ func (s *Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	url, err := url.Parse(string(body))
-	if url.Host == "" || err != nil {
-		log.Println("shortener: no url in request")
-		http.Error(w, "Wrong url", http.StatusBadRequest)
+	shortURL, err := s.shortenURL(w, string(body))
+	if err != nil {
+		http.Error(w, "Wrong URL", http.StatusBadRequest)
+		log.Printf("shortener: %v", err)
 
 		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	// nolint:errcheck
+	w.Write([]byte(shortURL))
+}
+func (s Shortener) shortenURL(w http.ResponseWriter, u string) (shortURL string, retErr error) {
+	url, err := checkURL(u)
+	if err != nil {
+
+		return "", err
 	}
 	// цикл проверки уникальности
 	for {
@@ -58,20 +104,19 @@ func (s *Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		if _, err := s.db.Get(key); err != nil {
 			// nolint:errcheck
 			s.db.Store(key, url.String()) // не проверяем ошибку, т.к. уникальность ключа только что проверена.
-			log.Printf("shortener: ShortenURL: created a token %v for %v", key, url)
-			w.WriteHeader(http.StatusCreated)
-			fmt.Fprintf(w, "%s%s/%s", s.host, s.port, key)
-			return
+			log.Printf("[INF] shortener: ShortenURL: created a token %v for %v", key, url)
+			shortURL = fmt.Sprintf("%s/%s", s.BaseURL, key)
+
+			return shortURL, nil
 		}
 		log.Printf("Wow!!! %d-значный случайный код повторился! Совпадение? Не думаю!", keyLength)
 	}
-
 }
 
 // DecodeURL принимает короткий параметр и производит редирект на изначальный url с кодом 307.
 //
 // GET /{id}
-func (s *Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
+func (s Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
 	key, ok := mux.Vars(r)["id"]
 	if !ok || len(key) != 8 {
 		log.Printf("shortener: DecodeURL: wrong key '%v'", key)
@@ -100,4 +145,19 @@ func generateKey() string {
 	}
 
 	return string(buf)
+}
+
+// checkURL проверяет входящую строку, является ли она URL с полями scheme и host
+func checkURL(u string) (*url.URL, error) {
+	url, err := url.Parse(u)
+	if err != nil {
+
+		return nil, err
+	}
+	if url.Host == "" || url.Scheme == "" {
+
+		return nil, fmt.Errorf("wrong URL: %s", u)
+	}
+
+	return url, nil
 }
