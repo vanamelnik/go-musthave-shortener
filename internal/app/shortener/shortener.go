@@ -132,8 +132,7 @@ func (s Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("shortener: DecodeURL: redirecting to %v (key: %v)", url, key)
-	w.Header().Add("Location", url)
-	w.WriteHeader(http.StatusTemporaryRedirect)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 // generateKey создает рандомную строку из строчных букв и цифр. Длина строки задана в глобальной переменной keyLength.
