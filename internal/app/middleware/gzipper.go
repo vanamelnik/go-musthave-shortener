@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"compress/gzip"
 	"io"
 	"log"
 	"net/http"
@@ -31,27 +32,15 @@ func Gzipper(next http.Handler) http.Handler {
 			return
 		}
 
-		// gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
-		// if err != nil {
-		// 	log.Printf("gzipHandle: %v", err)
-		// 	http.Error(w, "Internal server error", http.StatusInternalServerError)
+		gz, err := gzip.NewWriterLevel(w, gzip.BestCompression)
+		if err != nil {
+			log.Printf("gzipHandle: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 
-		// 	return
-		// }
-		gz := counter{w: w}
-
-		// w.Header().Set("Content-Encoding", "gzip")
+			return
+		}
+		defer gz.Close()
+		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(gzipWriter{ResponseWriter: w, w: gz}, r)
 	})
-}
-
-type counter struct {
-	w   io.Writer
-	cnt int
-}
-
-func (c counter) Write(b []byte) (int, error) {
-	cnt, err := c.w.Write(b)
-	c.cnt = cnt
-	return cnt, err
 }
