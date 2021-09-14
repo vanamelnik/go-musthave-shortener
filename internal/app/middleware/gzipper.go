@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"compress/gzip"
 	"io"
 	"log"
 	"net/http"
@@ -16,7 +15,11 @@ type gzipWriter struct {
 }
 
 func (gw gzipWriter) Write(data []byte) (int, error) {
-	return gw.Writer.Write(data)
+	log.Printf("gzipWriter: Writting %d bytes...", len(data))
+
+	cnt, err := gw.Writer.Write(data)
+	log.Printf("gzipWriter: Wrote %d bytes, err: %v", cnt, err)
+	return cnt, err
 }
 
 // Gzipper middleware проверяет, поддерживает ли фронтенд сжатие gzip, и, если да,
@@ -27,16 +30,17 @@ func Gzipper(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		http.Error(w, "Here we go! But there's no gzip)))", http.StatusTeapot)
 
-		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
-		if err != nil {
-			log.Printf("gzipHandle: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		// gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
+		// if err != nil {
+		// 	log.Printf("gzipHandle: %v", err)
+		// 	http.Error(w, "Internal server error", http.StatusInternalServerError)
 
-			return
-		}
+		// 	return
+		// }
 
-		w.Header().Set("Content-Encoding", "gzip")
-		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
+		// w.Header().Set("Content-Encoding", "gzip")
+		// next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
 	})
 }
