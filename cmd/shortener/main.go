@@ -25,6 +25,7 @@ const (
 	srvAddrDefault  = ":8080"
 )
 
+// config определяет базовую конйигурацию сервиса
 type config struct {
 	baseURL       string
 	srvAddr       string
