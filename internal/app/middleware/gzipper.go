@@ -30,7 +30,7 @@ func Gzipper(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		http.Error(w, "Here we go! But there's no gzip)))", http.StatusTeapot)
+		next.ServeHTTP(w, r)
 
 		// gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
 		// if err != nil {
