@@ -10,14 +10,14 @@ import (
 // gzipWriter подменяет собой http.ResponseWriter и сжимает входящие в него данные.
 type gzipWriter struct {
 	http.ResponseWriter
-	// Writer должен быть установлен как gzip.Writer.
-	Writer io.Writer
+	// w должен быть установлен как gzipWriter
+	w io.Writer
 }
 
 func (gw gzipWriter) Write(data []byte) (int, error) {
 	log.Printf("gzipWriter: Writting %d bytes...", len(data))
 
-	cnt, err := gw.Writer.Write(data)
+	cnt, err := gw.w.Write(data)
 	log.Printf("gzipWriter: Wrote %d bytes, err: %v", cnt, err)
 	return cnt, err
 }
@@ -30,7 +30,6 @@ func Gzipper(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		next.ServeHTTP(w, r)
 
 		// gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
 		// if err != nil {
@@ -39,8 +38,20 @@ func Gzipper(next http.Handler) http.Handler {
 
 		// 	return
 		// }
+		gz := counter{w: w}
 
 		// w.Header().Set("Content-Encoding", "gzip")
-		// next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
+		next.ServeHTTP(gzipWriter{ResponseWriter: w, w: gz}, r)
 	})
+}
+
+type counter struct {
+	w   io.Writer
+	cnt int
+}
+
+func (c counter) Write(b []byte) (int, error) {
+	cnt, err := c.w.Write(b)
+	c.cnt = cnt
+	return cnt, err
 }
