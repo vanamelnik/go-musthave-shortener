@@ -23,9 +23,7 @@ func (gw gzipWriter) Write(data []byte) (int, error) {
 // то сжимает тело ответа.
 func Gzipper(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Gzipper: enter!")
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			log.Printf("Gzipper: encoding not accepted: %v", r.Header)
 			next.ServeHTTP(w, r)
 			return
 		}
