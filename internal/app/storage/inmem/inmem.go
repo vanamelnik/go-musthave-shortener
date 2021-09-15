@@ -5,17 +5,24 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
 )
 
 var _ storage.Storage = (*DB)(nil)
 
+type row struct {
+	SessionId   uuid.UUID
+	UrlOriginal string
+	Key         string
+}
+
 // DB - реализация интерфейса DB c thread-safe inmemory хранилищем (map с RW Mutex).
 type DB struct {
 	sync.RWMutex
 
-	// repo - in-memory хранилище пар ключ-URL
-	repo map[string]string // [key]url
+	// repo - in-memory хранилище
+	repo []row
 
 	// fileName - имя файла, который хранит данные надиске в формате gob. При старте сервиса in-memory
 	// хранилище загружается из файла и по ходу работы периодически переписывает файл, если были изменения.
@@ -72,7 +79,11 @@ func (db *DB) Store(key, url string) error {
 	}
 	db.Lock()
 	defer db.Unlock()
-	db.repo[key] = url
+	db.repo = append(db.repo, row{
+		SessionId:   uuid.Nil, // TODO: implement authentication
+		UrlOriginal: url,
+		Key:         key,
+	})
 	db.isChanged = true
 
 	return nil
@@ -80,11 +91,8 @@ func (db *DB) Store(key, url string) error {
 
 // Has проверяет наличие в базе записи с ключом key.
 func (db *DB) Has(key string) bool {
-	db.RLock()
-	defer db.RUnlock()
-	_, ok := db.repo[key]
-
-	return ok
+	_, err := db.Get(key)
+	return err == nil
 }
 
 // Get извлекает из хранилища длинный url по ключу.
@@ -92,10 +100,12 @@ func (db *DB) Has(key string) bool {
 func (db *DB) Get(key string) (string, error) {
 	db.RLock()
 	defer db.RUnlock()
-	url, ok := db.repo[key]
-	if !ok {
-		return "", fmt.Errorf("DB: key %s not found", key)
+
+	for _, r := range db.repo {
+		if r.Key == key {
+			return r.UrlOriginal, nil
+		}
 	}
 
-	return url, nil
+	return "", fmt.Errorf("DB: key %s not found", key)
 }

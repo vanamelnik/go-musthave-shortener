@@ -11,12 +11,18 @@ import (
 // TestGet тестирует функцию Get с использованием фейкового хранилища.
 func TestGet(t *testing.T) {
 	db := DB{
-		repo: map[string]string{
+		repo: []row{
+			{Key: "key1", UrlOriginal: "url1"},
+			{Key: "key2", UrlOriginal: "url2"},
+			{Key: "", UrlOriginal: "url"},
+			{Key: "key", UrlOriginal: ""},
+		},
+		/*map[string]string{
 			"key1": "url1",
 			"key2": "url2",
 			"":     "url",
 			"key":  "",
-		},
+		},*/
 	}
 	tt := []struct {
 		name    string
