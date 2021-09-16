@@ -16,6 +16,7 @@ import (
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/middleware"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
+	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/postgres"
 )
 
 const (
@@ -26,6 +27,8 @@ const (
 	fileNameDefault = "localhost.db"
 	baseURLDefault  = "http://localhost:8080"
 	srvAddrDefault  = ":8080"
+
+	dsnDefault = "host=localhost port=5432 user=postgres password=qwe123 dbname=postgres"
 )
 
 // config определяет базовую конйигурацию сервиса
@@ -34,6 +37,7 @@ type config struct {
 	srvAddr       string
 	fileName      string
 	flushInterval time.Duration
+	dsn           string
 }
 
 // validate проверяет конфигурацию и выдает ошибку, если обнаруживает пустые поля.
@@ -51,6 +55,9 @@ func (cfg config) validate() error {
 	}
 	if cfg.flushInterval == 0 {
 		problems = append(problems, "flushing interval")
+	}
+	if cfg.dsn == "" {
+		problems = append(problems, "DSN")
 	}
 
 	if len(problems) != 0 {
@@ -80,9 +87,26 @@ func main() {
 	}
 	defer db.Close()
 
+	postgr, err := postgres.NewDB(cfg.dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer postgr.Close()
+
 	s := shortener.NewShortener(cfg.baseURL, db)
 
 	router := mux.NewRouter()
+
+	router.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		if err := postgr.Ping(); err != nil {
+			log.Printf("postgres: ping: %v", err)
+			http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+			return
+		}
+		log.Println("postgres: ping OK")
+	}).Methods(http.MethodGet)
+
 	router.HandleFunc("/{id}", s.DecodeURL).Methods(http.MethodGet)
 	router.HandleFunc("/", s.ShortenURL).Methods(http.MethodPost)
 	router.HandleFunc("/api/shorten", s.APIShortenURL).Methods(http.MethodPost)
@@ -120,6 +144,7 @@ func newConfig(opts ...configOption) config {
 		srvAddr:       srvAddrDefault,
 		fileName:      fileNameDefault,
 		flushInterval: flushInterval,
+		dsn:           dsnDefault,
 	}
 
 	for _, fn := range opts {
@@ -134,6 +159,7 @@ func withFlags() configOption {
 		flag.StringVar(&cfg.srvAddr, "a", srvAddrDefault, "Server address")
 		flag.StringVar(&cfg.baseURL, "b", baseURLDefault, "Base URL")
 		flag.StringVar(&cfg.fileName, "f", fileNameDefault, "File storage path")
+		flag.StringVar(&cfg.dsn, "d", dsnDefault, "Database DSN")
 		flag.Parse()
 	}
 }
@@ -144,6 +170,7 @@ func withEnv() configOption {
 			"BASE_URL":          &cfg.baseURL,
 			"SERVER_ADDRESS":    &cfg.srvAddr,
 			"FILE_STORAGE_PATH": &cfg.fileName,
+			"DATABASE_DSN":      &cfg.dsn,
 		}
 
 		for v := range env {
