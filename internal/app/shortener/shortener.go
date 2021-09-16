@@ -44,7 +44,7 @@ func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 	type Result struct {
 		Result string `json:"result"`
 	}
-	id, err := context.Id(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
+	id, err := context.ID(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
 	if err != nil {
 		log.Printf("shortener: %v", err)
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)
@@ -83,7 +83,7 @@ func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 //
 // POST /
 func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
-	id, err := context.Id(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
+	id, err := context.ID(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
 	if err != nil {
 		log.Printf("shortener: %v", err)
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)
@@ -162,7 +162,7 @@ func (s Shortener) UserURLs(w http.ResponseWriter, r *http.Request) {
 		OriginalURL string `json:"original_url"`
 	}
 
-	id, err := context.Id(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
+	id, err := context.ID(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
 	if err != nil {
 		log.Printf("shortener: %v", err)
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)

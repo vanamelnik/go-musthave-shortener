@@ -132,7 +132,7 @@ func TestShortener(t *testing.T) {
 	for _, tc := range testsPost {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest("POST", "/", strings.NewReader(tc.body))
-			ctx := context.WithId(r.Context(), uuid.New())
+			ctx := context.WithID(r.Context(), uuid.New())
 			r = r.WithContext(ctx)
 			w := httptest.NewRecorder()
 			h := http.HandlerFunc(s.ShortenURL)
@@ -243,7 +243,7 @@ func TestAPIShorten(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest("POST", "/api/shorten", strings.NewReader(tc.body))
-			ctx := context.WithId(r.Context(), uuid.New())
+			ctx := context.WithID(r.Context(), uuid.New())
 			r = r.WithContext(ctx)
 			w := httptest.NewRecorder()
 			h := http.HandlerFunc(s.APIShortenURL)

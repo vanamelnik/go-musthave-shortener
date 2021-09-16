@@ -34,7 +34,7 @@ func CookieMdlw(secret string) mux.MiddlewareFunc {
 				}
 			}
 
-			ctx := context.WithId(r.Context(), id)
+			ctx := context.WithID(r.Context(), id)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

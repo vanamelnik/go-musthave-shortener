@@ -13,10 +13,10 @@ import (
 func TestGet(t *testing.T) {
 	db := DB{
 		repo: []row{
-			{Key: "key1", UrlOriginal: "url1"},
-			{Key: "key2", UrlOriginal: "url2"},
-			{Key: "", UrlOriginal: "url"},
-			{Key: "key", UrlOriginal: ""},
+			{Key: "key1", OriginalURL: "url1"},
+			{Key: "key2", OriginalURL: "url2"},
+			{Key: "", OriginalURL: "url"},
+			{Key: "key", OriginalURL: ""},
 		},
 		/*map[string]string{
 			"key1": "url1",

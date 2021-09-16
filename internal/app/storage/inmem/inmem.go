@@ -12,8 +12,8 @@ import (
 var _ storage.Storage = (*DB)(nil)
 
 type row struct {
-	SessionId   uuid.UUID
-	UrlOriginal string
+	SessionID   uuid.UUID
+	OriginalURL string
 	Key         string
 }
 
@@ -80,8 +80,8 @@ func (db *DB) Store(id uuid.UUID, key, url string) error {
 	db.Lock()
 	defer db.Unlock()
 	db.repo = append(db.repo, row{
-		SessionId:   id,
-		UrlOriginal: url,
+		SessionID:   id,
+		OriginalURL: url,
 		Key:         key,
 	})
 	db.isChanged = true
@@ -103,7 +103,7 @@ func (db *DB) Get(key string) (string, error) {
 
 	for _, r := range db.repo {
 		if r.Key == key {
-			return r.UrlOriginal, nil
+			return r.OriginalURL, nil
 		}
 	}
 
@@ -118,8 +118,8 @@ func (db *DB) GetAll(id uuid.UUID) map[string]string {
 	defer db.RUnlock()
 
 	for _, r := range db.repo {
-		if r.SessionId == id {
-			list[r.Key] = r.UrlOriginal
+		if r.SessionID == id {
+			list[r.Key] = r.OriginalURL
 		}
 	}
 	return list
