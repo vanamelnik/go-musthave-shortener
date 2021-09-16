@@ -21,6 +21,8 @@ import (
 const (
 	flushInterval = 10 * time.Second
 
+	secret = "секретный ключ, которым шифруются подписи"
+
 	fileNameDefault = "localhost.db"
 	baseURLDefault  = "http://localhost:8080"
 	srvAddrDefault  = ":8080"
@@ -84,7 +86,9 @@ func main() {
 	router.HandleFunc("/{id}", s.DecodeURL).Methods(http.MethodGet)
 	router.HandleFunc("/", s.ShortenURL).Methods(http.MethodPost)
 	router.HandleFunc("/api/shorten", s.APIShortenURL).Methods(http.MethodPost)
-	router.Use(middleware.Gzipper)
+	router.HandleFunc("/user/urls", s.UserURLs).Methods(http.MethodGet)
+
+	router.Use(middleware.CookieMdlw(secret), middleware.GzipMdlw)
 
 	server := http.Server{
 		Addr:    cfg.srvAddr,

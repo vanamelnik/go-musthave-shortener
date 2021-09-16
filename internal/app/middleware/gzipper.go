@@ -35,15 +35,15 @@ func (gw gzipWriter) Write(data []byte) (int, error) {
 	return gw.Writer.Write(data)
 }
 
-// Gzipper middleware проверяет, поддерживает ли фронтенд сжатие gzip, и, если да,
-// то сжимает тело ответа.
-func Gzipper(next http.Handler) http.Handler {
+// GzipMdlw распаковывет тело запроса при наличии сжатия и проверяет, поддерживает ли фронтенд сжатие ответа gzip,
+// и, если да, то сжимает тело ответа.
+func GzipMdlw(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 			gr, err := gzip.NewReader(r.Body)
 			if err != nil {
 				log.Printf("gzipHandle: %v", err)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				http.Error(w, "Something went wrong", http.StatusInternalServerError)
 
 				return
 			}
@@ -61,7 +61,7 @@ func Gzipper(next http.Handler) http.Handler {
 		gw, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
 		if err != nil {
 			log.Printf("gzipHandle: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			http.Error(w, "Something went wrong", http.StatusInternalServerError)
 
 			return
 		}

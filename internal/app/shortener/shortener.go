@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/google/uuid"
+	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/context"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
 
 	"github.com/gorilla/mux"
@@ -42,6 +44,14 @@ func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 	type Result struct {
 		Result string `json:"result"`
 	}
+	id, err := context.Id(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
+	if err != nil {
+		log.Printf("shortener: %v", err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
+
 	urlReq := Request{}
 	dec := json.NewDecoder(r.Body)
 	defer r.Body.Close()
@@ -51,7 +61,7 @@ func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	shortURL, err := s.shortenURL(w, urlReq.URL)
+	shortURL, err := s.shortenURL(w, id, urlReq.URL)
 	if err != nil {
 		log.Printf("APIShortenURL: %v", err)
 		http.Error(w, "Wrong URL", http.StatusBadRequest)
@@ -73,6 +83,14 @@ func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 //
 // POST /
 func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
+	id, err := context.Id(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
+	if err != nil {
+		log.Printf("shortener: %v", err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
+
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -81,7 +99,7 @@ func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	shortURL, err := s.shortenURL(w, string(body))
+	shortURL, err := s.shortenURL(w, id, string(body))
 	if err != nil {
 		http.Error(w, "Wrong URL", http.StatusBadRequest)
 		log.Printf("shortener: %v", err)
@@ -92,7 +110,7 @@ func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	// nolint:errcheck
 	w.Write([]byte(shortURL))
 }
-func (s Shortener) shortenURL(w http.ResponseWriter, u string) (shortURL string, retErr error) {
+func (s Shortener) shortenURL(w http.ResponseWriter, id uuid.UUID, u string) (shortURL string, retErr error) {
 	url, err := checkURL(u)
 	if err != nil {
 
@@ -103,7 +121,7 @@ func (s Shortener) shortenURL(w http.ResponseWriter, u string) (shortURL string,
 		key := generateKey()
 		if _, err := s.db.Get(key); err != nil {
 			// nolint:errcheck
-			s.db.Store(key, url.String()) // не проверяем ошибку, т.к. уникальность ключа только что проверена.
+			s.db.Store(id, key, url.String()) // не проверяем ошибку, т.к. уникальность ключа только что проверена.
 			log.Printf("[INF] shortener: ShortenURL: created a token %v for %v", key, url)
 			shortURL = fmt.Sprintf("%s/%s", s.BaseURL, key)
 
@@ -133,6 +151,47 @@ func (s Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("shortener: DecodeURL: redirecting to %v (key: %v)", url, key)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+// UserURLs возвращает в ответе json с массивом записей всех URL, созданных текущем пользователем
+//
+// GET /user/urls
+func (s Shortener) UserURLs(w http.ResponseWriter, r *http.Request) {
+	type urlRec struct {
+		ShortURL    string `json:"short_url"`
+		OriginalURL string `json:"original_url"`
+	}
+
+	id, err := context.Id(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
+	if err != nil {
+		log.Printf("shortener: %v", err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
+
+	list := s.db.GetAll(id)
+	log.Printf("[INF] shortener: requested entries for id=%s, found %d items.", id, len(list))
+	if len(list) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	userURLs := make([]urlRec, 0, len(list))
+	for key, url := range list {
+		userURLs = append(userURLs, urlRec{
+			ShortURL:    fmt.Sprintf("%s/%s", s.BaseURL, key),
+			OriginalURL: url,
+		})
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(userURLs); err != nil {
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+		log.Printf("shortener: %v", err)
+	}
 }
 
 // generateKey создает рандомную строку из строчных букв и цифр. Длина строки задана в глобальной переменной keyLength.

@@ -17,7 +17,7 @@ type row struct {
 	Key         string
 }
 
-// DB - реализация интерфейса DB c thread-safe inmemory хранилищем (map с RW Mutex).
+// DB - реализация интерфейса storage.Storage c thread-safe inmemory хранилищем (структура с RW Mutex).
 type DB struct {
 	sync.RWMutex
 
@@ -73,14 +73,14 @@ func (db *DB) Close() {
 
 // Store сохраняет в репозитории пару ключ:url.
 // если ключ уже используется, выдается ошибка.
-func (db *DB) Store(key, url string) error {
+func (db *DB) Store(id uuid.UUID, key, url string) error {
 	if db.Has(key) {
 		return fmt.Errorf("DB: the key %s already in use", key)
 	}
 	db.Lock()
 	defer db.Unlock()
 	db.repo = append(db.repo, row{
-		SessionId:   uuid.Nil, // TODO: implement authentication
+		SessionId:   id,
 		UrlOriginal: url,
 		Key:         key,
 	})
@@ -108,4 +108,19 @@ func (db *DB) Get(key string) (string, error) {
 	}
 
 	return "", fmt.Errorf("DB: key %s not found", key)
+}
+
+// GetAll является реализацией метода GetAll интерфейса storage.Storage
+func (db *DB) GetAll(id uuid.UUID) map[string]string {
+	list := make(map[string]string)
+
+	db.RLock()
+	defer db.RUnlock()
+
+	for _, r := range db.repo {
+		if r.SessionId == id {
+			list[r.Key] = r.UrlOriginal
+		}
+	}
+	return list
 }

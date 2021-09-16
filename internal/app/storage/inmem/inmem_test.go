@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -132,7 +133,7 @@ func TestInmem(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.action == "store" || tc.action == "both" {
-				if err := db.Store(tc.args.key, tc.args.url); (err != nil) != tc.wantErrStore {
+				if err := db.Store(uuid.Nil, tc.args.key, tc.args.url); (err != nil) != tc.wantErrStore {
 					t.Errorf("DB.Store() error = %v, wantErr %v", err, tc.wantErrStore)
 				}
 			}
