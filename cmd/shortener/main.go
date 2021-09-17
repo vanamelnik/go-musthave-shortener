@@ -15,7 +15,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/middleware"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/postgres"
 )
 
@@ -81,24 +80,24 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	db, err := inmem.NewDB(cfg.fileName, cfg.flushInterval)
+	// db, err := inmem.NewDB(cfg.fileName, cfg.flushInterval)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer db.Close()
+
+	db, err := postgres.NewRepo(cfg.dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
-
-	postgr, err := postgres.NewDB(cfg.dsn)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer postgr.Close()
 
 	s := shortener.NewShortener(cfg.baseURL, db)
 
 	router := mux.NewRouter()
 
 	router.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		if err := postgr.Ping(); err != nil {
+		if err := db.Ping(); err != nil {
 			log.Printf("postgres: ping: %v", err)
 			http.Error(w, "Something went wrong", http.StatusInternalServerError)
 

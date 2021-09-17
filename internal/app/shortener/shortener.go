@@ -95,7 +95,7 @@ func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("shortener: ShortenURL: %v", err)
-		http.Error(w, "Sorry, something went worng...", http.StatusInternalServerError)
+		http.Error(w, "Sorry, something went wrong...", http.StatusInternalServerError)
 
 		return
 	}
@@ -120,8 +120,10 @@ func (s Shortener) shortenURL(w http.ResponseWriter, id uuid.UUID, u string) (sh
 	for {
 		key := generateKey()
 		if _, err := s.db.Get(key); err != nil {
-			// nolint:errcheck
-			s.db.Store(id, key, url.String()) // не проверяем ошибку, т.к. уникальность ключа только что проверена.
+			err = s.db.Store(id, key, url.String())
+			if err != nil {
+				return "", err
+			}
 			log.Printf("[INF] shortener: ShortenURL: created a token %v for %v", key, url)
 			shortURL = fmt.Sprintf("%s/%s", s.BaseURL, key)
 
