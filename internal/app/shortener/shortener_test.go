@@ -198,6 +198,16 @@ func (ms MockStorage) GetAll(id uuid.UUID) map[string]string {
 	return nil
 }
 
+func (ms MockStorage) BatchStore(id uuid.UUID, records []storage.Record) error {
+	return nil
+}
+
+func (ms MockStorage) Close() {}
+
+func (ms MockStorage) Ping() error {
+	return nil
+}
+
 func TestAPIShorten(t *testing.T) {
 	rand.Seed(1)
 	const fakeKey = "fpllngzi" // Первый ключ, генерируемый при rand.Seed(1)

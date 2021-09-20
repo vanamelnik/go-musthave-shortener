@@ -124,3 +124,30 @@ func (db *DB) GetAll(id uuid.UUID) map[string]string {
 	}
 	return list
 }
+
+// BatchStore - реализация метода интерфейса storage.Storage
+func (db *DB) BatchStore(id uuid.UUID, records []storage.Record) error {
+	db.Lock()
+	defer db.Unlock()
+
+	// не используем методы Has и Store, чтобы много раз не лочить / разлочивать... Или ну его?
+	for _, rec := range records {
+		for _, r := range db.repo {
+			if r.Key == rec.Key {
+				return fmt.Errorf("DB: key %s already defined", rec.Key)
+			}
+		}
+		db.repo = append(db.repo, row{
+			SessionID:   id,
+			OriginalURL: rec.OriginalURL,
+			Key:         rec.Key,
+		})
+		db.isChanged = true
+	}
+
+	return nil
+}
+
+func (db *DB) Ping() error {
+	return nil
+}

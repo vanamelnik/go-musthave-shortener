@@ -15,6 +15,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/middleware"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
+	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
+	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/postgres"
 )
 
@@ -37,6 +39,7 @@ type config struct {
 	fileName      string
 	flushInterval time.Duration
 	dsn           string
+	inMemory      bool
 }
 
 // validate проверяет конфигурацию и выдает ошибку, если обнаруживает пустые поля.
@@ -55,7 +58,7 @@ func (cfg config) validate() error {
 	if cfg.flushInterval == 0 {
 		problems = append(problems, "flushing interval")
 	}
-	if cfg.dsn == "" {
+	if cfg.dsn == "" && !cfg.inMemory {
 		problems = append(problems, "DSN")
 	}
 
@@ -73,24 +76,30 @@ func main() {
 		withFlags(),
 		withEnv(),
 	)
-	if err := cfg.validate(); err != nil {
+	err := cfg.validate()
+	if err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("Server configuration: %+v", cfg)
 
 	rand.Seed(time.Now().UnixNano())
 
-	// db, err := inmem.NewDB(cfg.fileName, cfg.flushInterval)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer db.Close()
-
-	db, err := postgres.NewRepo(cfg.dsn)
-	if err != nil {
-		log.Fatal(err)
+	var db storage.Storage
+	if cfg.inMemory {
+		log.Println("Connecting to in-memory storage...")
+		db, err = inmem.NewDB(cfg.fileName, cfg.flushInterval)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer db.Close()
+	} else {
+		log.Println("Connecting to Postgres engine...")
+		db, err = postgres.NewRepo(cfg.dsn)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer db.Close()
 	}
-	defer db.Close()
 
 	s := shortener.NewShortener(cfg.baseURL, db)
 
@@ -109,6 +118,7 @@ func main() {
 	router.HandleFunc("/{id}", s.DecodeURL).Methods(http.MethodGet)
 	router.HandleFunc("/", s.ShortenURL).Methods(http.MethodPost)
 	router.HandleFunc("/api/shorten", s.APIShortenURL).Methods(http.MethodPost)
+	router.HandleFunc("/api/shorten/batch", s.BatchShortenURL).Methods(http.MethodPost)
 	router.HandleFunc("/user/urls", s.UserURLs).Methods(http.MethodGet)
 
 	router.Use(middleware.CookieMdlw(secret), middleware.GzipMdlw)
@@ -141,13 +151,24 @@ func newConfig(opts ...configOption) config {
 	cfg := config{
 		baseURL:       baseURLDefault,
 		srvAddr:       srvAddrDefault,
+		inMemory:      true,
 		fileName:      fileNameDefault,
 		flushInterval: flushInterval,
-		dsn:           dsnDefault,
+		dsn:           "", // значения по умолчанию будут внесены функцией newConfig.
 	}
 
 	for _, fn := range opts {
 		fn(&cfg)
+	}
+
+	// Если пользователь передал DSN для Postgres, используем Postgres
+	if cfg.dsn != "" {
+		cfg.inMemory = false
+	}
+
+	// если пользователь указал использование postgres, но не передал данных DSN, используются DSN по умолчанию.
+	if !cfg.inMemory && cfg.dsn == "" {
+		cfg.dsn = dsnDefault
 	}
 
 	return cfg
@@ -158,7 +179,8 @@ func withFlags() configOption {
 		flag.StringVar(&cfg.srvAddr, "a", srvAddrDefault, "Server address")
 		flag.StringVar(&cfg.baseURL, "b", baseURLDefault, "Base URL")
 		flag.StringVar(&cfg.fileName, "f", fileNameDefault, "File storage path")
-		flag.StringVar(&cfg.dsn, "d", dsnDefault, "Database DSN")
+		flag.StringVar(&cfg.dsn, "d", "", "Database DSN")
+		flag.BoolVar(&cfg.inMemory, "i", true, "Use in-memory repository instead of postgres DB.")
 		flag.Parse()
 	}
 }

@@ -196,6 +196,75 @@ func (s Shortener) UserURLs(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// BatchShortenURL формирует ключи для переданных через тело запроса URL и передает данные на сохранение в базу данных.
+//
+// POST /api/shorten/batch
+func (s Shortener) BatchShortenURL(w http.ResponseWriter, r *http.Request) {
+	type (
+		req struct {
+			CorrelationID string `json:"correlation_id"`
+			OriginalURL   string `json:"original_url"`
+		}
+		resp struct {
+			CorrelationID string `json:"correlation_id"`
+			ShortURL      string `json:"short_url"`
+		}
+	)
+	id, err := context.ID(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
+	if err != nil {
+		log.Printf("shortener: Batch: %v", err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
+	defer r.Body.Close()
+	dec := json.NewDecoder(r.Body)
+	batchReq := make([]req, 0)
+	if err = dec.Decode(&batchReq); err != nil {
+		log.Printf("shortener: Batch: %v", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+
+		return
+	}
+
+	records := make([]storage.Record, 0, len(batchReq))
+	for _, rec := range batchReq {
+		records = append(records, storage.Record{
+			CorellationID: rec.CorrelationID,
+			OriginalURL:   rec.OriginalURL,
+			Key:           generateKey(),
+		})
+	}
+
+	if err = s.db.BatchStore(id, records); err != nil {
+		log.Printf("shortener: Batch: cannot store the records: %v", err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
+
+	batchResp := make([]resp, len(records))
+	for i, rec := range records {
+		batchResp[i] = resp{
+			CorrelationID: rec.CorellationID,
+			ShortURL:      fmt.Sprintf("%s/%s", s.BaseURL, rec.Key),
+		}
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	enc := json.NewEncoder(w)
+	err = enc.Encode(&batchResp)
+	if err != nil {
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+		log.Printf("shortener: Batch: %v", err)
+
+		return
+	}
+
+	log.Printf("shortener: Batch: successfully added %d records to the repository", len(records))
+}
+
 // generateKey создает рандомную строку из строчных букв и цифр. Длина строки задана в глобальной переменной keyLength.
 func generateKey() string {
 	const chars = "abcdefghijklmnopqrstuvwxyz1234567890"
