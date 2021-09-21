@@ -74,9 +74,16 @@ func (db *DB) Close() {
 // Store сохраняет в репозитории пару ключ:url.
 // если ключ уже используется, выдается ошибка.
 func (db *DB) Store(id uuid.UUID, key, url string) error {
-	if db.Has(key) {
+	if db.hasKey(key) {
 		return fmt.Errorf("DB: the key %s already in use", key)
 	}
+	if exitingKey, ok := db.hasURL(url); ok {
+		return &storage.ErrURLArlreadyExists{
+			Key: exitingKey,
+			Url: url,
+		}
+	}
+
 	db.Lock()
 	defer db.Unlock()
 	db.repo = append(db.repo, row{
@@ -89,10 +96,24 @@ func (db *DB) Store(id uuid.UUID, key, url string) error {
 	return nil
 }
 
-// Has проверяет наличие в базе записи с ключом key.
-func (db *DB) Has(key string) bool {
+// hasKey проверяет наличие в базе записи с ключом key.
+func (db *DB) hasKey(key string) bool {
 	_, err := db.Get(key)
 	return err == nil
+}
+
+// hasUrl проверяет в базе записи с переданным url и в случае успеха возвращает ключ
+func (db *DB) hasURL(url string) (key string, ok bool) {
+	db.RLock()
+	defer db.RUnlock()
+
+	for _, rec := range db.repo {
+		if rec.OriginalURL == url {
+			return rec.Key, true
+		}
+	}
+
+	return "", false
 }
 
 // Get извлекает из хранилища длинный url по ключу.

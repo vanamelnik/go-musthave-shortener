@@ -2,6 +2,7 @@ package shortener
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -62,14 +63,22 @@ func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	shortURL, err := s.shortenURL(w, id, urlReq.URL)
+	statusCode := http.StatusCreated
 	if err != nil {
 		log.Printf("APIShortenURL: %v", err)
-		http.Error(w, "Wrong URL", http.StatusBadRequest)
+		var errURLAlreadyExists *storage.ErrURLArlreadyExists
 
-		return
+		if errors.As(err, &errURLAlreadyExists) {
+			statusCode = http.StatusConflict
+			shortURL = fmt.Sprintf("%s/%s", s.BaseURL, errURLAlreadyExists.Key)
+		} else {
+			http.Error(w, "Wrong URL", http.StatusBadRequest)
+
+			return
+		}
 	}
 	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(statusCode)
 	enc := json.NewEncoder(w)
 	err = enc.Encode(&Result{Result: shortURL})
 	if err != nil {
@@ -101,8 +110,17 @@ func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 	shortURL, err := s.shortenURL(w, id, string(body))
 	if err != nil {
-		http.Error(w, "Wrong URL", http.StatusBadRequest)
 		log.Printf("shortener: %v", err)
+		var errURLAlreadyExists *storage.ErrURLArlreadyExists
+		if errors.As(err, &errURLAlreadyExists) {
+			w.WriteHeader(http.StatusConflict)
+			shortURL = fmt.Sprintf("%s/%s", s.BaseURL, errURLAlreadyExists.Key)
+			// nolint:errcheck
+			w.Write([]byte(shortURL))
+
+			return
+		}
+		http.Error(w, "Wrong URL", http.StatusBadRequest)
 
 		return
 	}

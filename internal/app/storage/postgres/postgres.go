@@ -33,7 +33,7 @@ func NewRepo(dsn string) (*Repo, error) {
 }
 
 func (r Repo) AutoMigrate() error {
-	const query = `CREATE TABLE IF NOT EXISTS repo (id TEXT, key TEXT UNIQUE, url TEXT);`
+	const query = `CREATE TABLE IF NOT EXISTS repo (id TEXT, key TEXT UNIQUE, url TEXT UNIQUE);`
 	_, err := r.db.ExecContext(context.Background(), query) // мы не используем передачу контекста, поскольку пока не планируется механизма завершения транзакций извне по какому-либо событию
 
 	return err
@@ -51,11 +51,23 @@ func (r Repo) DestructiveReset() error {
 }
 
 func (r Repo) Store(id uuid.UUID, key, url string) error {
-	_, err := r.db.ExecContext(context.Background(),
-		`INSERT INTO repo (id, key, url) VALUES ($1,$2,$3);`,
+	ctx := context.Background()
+	res, err := r.db.ExecContext(ctx,
+		`INSERT INTO repo (id, key, url) VALUES ($1,$2,$3)
+		ON CONFLICT (url) DO NOTHING;`,
 		id.String(), key, url)
 	if err != nil {
 		return fmt.Errorf("postgres: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		row := r.db.QueryRowContext(ctx, "SELECT key FROM repo WHERE url=$1", url)
+		if err = row.Scan(&key); err != nil {
+			return err
+		}
+		return &storage.ErrURLArlreadyExists{ // возвращаем имеющиеся ключ с URL'ом в теле ошибки.
+			Key: key,
+			Url: url,
+		}
 	}
 
 	return nil

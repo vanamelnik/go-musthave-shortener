@@ -30,4 +30,13 @@ type (
 		// Key - ключ для доступа к оригинальному URL
 		Key string
 	}
+
+	ErrURLArlreadyExists struct {
+		Key string
+		Url string
+	}
 )
+
+func (err ErrURLArlreadyExists) Error() string {
+	return "Url already exists in the database"
+}
