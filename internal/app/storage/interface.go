@@ -1,6 +1,10 @@
 package storage
 
-import "github.com/google/uuid"
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+)
 
 // Storage представляет хранилище для  пар key:URL.
 type (
@@ -31,12 +35,13 @@ type (
 		Key string
 	}
 
+	// ErrURLArlreadyExists возвращается при попытке сохранить в базу URL, который в ней уже сохранён.
 	ErrURLArlreadyExists struct {
 		Key string
-		Url string
+		URL string
 	}
 )
 
 func (err ErrURLArlreadyExists) Error() string {
-	return "Url already exists in the database"
+	return fmt.Sprintf("Url %s already exists in the database", err.URL)
 }

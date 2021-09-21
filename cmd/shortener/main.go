@@ -52,10 +52,10 @@ func (cfg config) validate() error {
 	if cfg.srvAddr == "" {
 		problems = append(problems, "server address")
 	}
-	if cfg.fileName == "" {
+	if cfg.fileName == "" && cfg.inMemory {
 		problems = append(problems, "storage file name")
 	}
-	if cfg.flushInterval == 0 {
+	if cfg.flushInterval == 0 && cfg.inMemory {
 		problems = append(problems, "flushing interval")
 	}
 	if cfg.dsn == "" && !cfg.inMemory {
@@ -166,9 +166,14 @@ func newConfig(opts ...configOption) config {
 		cfg.inMemory = false
 	}
 
-	// если пользователь указал использование postgres, но не передал данных DSN, используются DSN по умолчанию.
-	if !cfg.inMemory && cfg.dsn == "" {
-		cfg.dsn = dsnDefault
+	if !cfg.inMemory {
+		// если пользователь указал использование postgres, но не передал данных DSN, используются DSN по умолчанию.
+		if cfg.dsn == "" {
+			cfg.dsn = dsnDefault
+		}
+		// обнуляем поля конфигурации, не нужные для работы postgres
+		cfg.fileName = ""
+		cfg.flushInterval = 0
 	}
 
 	return cfg

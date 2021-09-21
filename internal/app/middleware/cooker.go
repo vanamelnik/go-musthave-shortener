@@ -74,7 +74,7 @@ func analyseCookies(r *http.Request, h hash.Hash) (uuid.UUID, bool) {
 		return uuid.Nil, false
 	}
 
-	log.Printf("CookieMdlw: successfully authenticated: id=%s, token=%s", id, cookie.Value)
+	log.Printf("CookieMdlw: successfully authenticated: id=%s", id)
 
 	return id, true
 }
@@ -90,7 +90,7 @@ func newSession(w http.ResponseWriter, h hash.Hash) (uuid.UUID, error) {
 
 	h.Write([]byte(id.String()))
 	token := hex.EncodeToString(h.Sum(nil))
-	log.Printf("CookieMdlw: successfully created new session id=%s, token=%s", id, token)
+	log.Printf("CookieMdlw: successfully created new session id=%s", id)
 
 	http.SetCookie(w, &http.Cookie{Name: "uuid", Value: id.String()})
 	http.SetCookie(w, &http.Cookie{Name: "token", Value: token})

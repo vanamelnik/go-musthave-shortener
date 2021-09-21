@@ -66,7 +66,7 @@ func (r Repo) Store(id uuid.UUID, key, url string) error {
 		}
 		return &storage.ErrURLArlreadyExists{ // возвращаем имеющиеся ключ с URL'ом в теле ошибки.
 			Key: key,
-			Url: url,
+			URL: url,
 		}
 	}
 

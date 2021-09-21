@@ -80,7 +80,7 @@ func (db *DB) Store(id uuid.UUID, key, url string) error {
 	if exitingKey, ok := db.hasURL(url); ok {
 		return &storage.ErrURLArlreadyExists{
 			Key: exitingKey,
-			Url: url,
+			URL: url,
 		}
 	}
 
