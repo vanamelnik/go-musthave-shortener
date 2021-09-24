@@ -75,13 +75,13 @@ func (cfg config) String() string {
 // validate проверяет конфигурацию и выдает ошибку, если обнаруживает пустые поля.
 func (cfg config) validate() (retErr error) {
 	if cfg.baseURL == "" {
-		retErr = multierror.Append(retErr, errors.New("Missing base URL"))
+		retErr = multierror.Append(retErr, errors.New("missing base URL"))
 	}
 	if cfg.srvAddr == "" {
-		retErr = multierror.Append(retErr, errors.New("Mising server address"))
+		retErr = multierror.Append(retErr, errors.New("mising server address"))
 	}
 	if cfg.dbType != dbInmem && cfg.dbType != dbPostgres {
-		retErr = multierror.Append(retErr, errors.New("Invalid storage type"))
+		retErr = multierror.Append(retErr, errors.New("invalid storage type"))
 	}
 
 	return
