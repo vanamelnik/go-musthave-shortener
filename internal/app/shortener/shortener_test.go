@@ -1,6 +1,7 @@
 package shortener_test
 
 import (
+	"context"
 	"errors"
 	"io"
 	"math/rand"
@@ -11,9 +12,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	appContext "github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/context"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
@@ -103,7 +107,7 @@ func TestShortener(t *testing.T) {
 			name: "Test GET#4 - unknown key (not stored in repo)",
 			arg:  &args[2],
 			want: want{
-				statusCode: http.StatusNotFound, // ***вопрос - такой ли должен быть статус?
+				statusCode: http.StatusNotFound,
 				body:       "URL not found",
 			},
 		},
@@ -130,6 +134,8 @@ func TestShortener(t *testing.T) {
 	for _, tc := range testsPost {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest("POST", "/", strings.NewReader(tc.body))
+			ctx := appContext.WithID(r.Context(), uuid.New())
+			r = r.WithContext(ctx)
 			w := httptest.NewRecorder()
 			h := http.HandlerFunc(s.ShortenURL)
 			h.ServeHTTP(w, r)
@@ -182,12 +188,26 @@ var _ storage.Storage = (*MockStorage)(nil)
 type MockStorage struct {
 }
 
-func (ms MockStorage) Store(key, url string) error {
+func (ms MockStorage) Store(ctx context.Context, id uuid.UUID, key, url string) error {
 	return nil // имитирует сохранение ключа в базе, ошибок быть не может
 }
 
-func (ms MockStorage) Get(key string) (string, error) {
+func (ms MockStorage) Get(ctx context.Context, key string) (string, error) {
 	return "", errors.New("Mock error") // Ошибка - элемент не найден (используется в цикле проверки уникальности)
+}
+
+func (ms MockStorage) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
+	return nil
+}
+
+func (ms MockStorage) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Record) error {
+	return nil
+}
+
+func (ms MockStorage) Close() {}
+
+func (ms MockStorage) Ping() error {
+	return nil
 }
 
 func TestAPIShorten(t *testing.T) {
@@ -235,6 +255,8 @@ func TestAPIShorten(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest("POST", "/api/shorten", strings.NewReader(tc.body))
+			ctx := appContext.WithID(r.Context(), uuid.New())
+			r = r.WithContext(ctx)
 			w := httptest.NewRecorder()
 			h := http.HandlerFunc(s.APIShortenURL)
 			h.ServeHTTP(w, r)

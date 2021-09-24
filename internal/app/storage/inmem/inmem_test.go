@@ -1,22 +1,30 @@
 package inmem
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
 // TestGet тестирует функцию Get с использованием фейкового хранилища.
 func TestGet(t *testing.T) {
 	db := DB{
-		repo: map[string]string{
+		repo: []row{
+			{Key: "key1", OriginalURL: "url1"},
+			{Key: "key2", OriginalURL: "url2"},
+			{Key: "", OriginalURL: "url"},
+			{Key: "key", OriginalURL: ""},
+		},
+		/*map[string]string{
 			"key1": "url1",
 			"key2": "url2",
 			"":     "url",
 			"key":  "",
-		},
+		},*/
 	}
 	tt := []struct {
 		name    string
@@ -57,7 +65,7 @@ func TestGet(t *testing.T) {
 	}
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			url, err := db.Get(tc.key)
+			url, err := db.Get(context.Background(), tc.key)
 			if (err != nil) != tc.wantErr {
 				if tc.wantErr {
 					t.Error("Expected err, got no error")
@@ -122,16 +130,17 @@ func TestInmem(t *testing.T) {
 		db.Close()
 		require.NoError(t, os.Remove("tmp.db"))
 	}()
+	ctx := context.Background()
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.action == "store" || tc.action == "both" {
-				if err := db.Store(tc.args.key, tc.args.url); (err != nil) != tc.wantErrStore {
+				if err := db.Store(ctx, uuid.Nil, tc.args.key, tc.args.url); (err != nil) != tc.wantErrStore {
 					t.Errorf("DB.Store() error = %v, wantErr %v", err, tc.wantErrStore)
 				}
 			}
 			if tc.action == "get" || tc.action == "both" {
-				url, err := db.Get(tc.args.key)
+				url, err := db.Get(ctx, tc.args.key)
 				if (err != nil) != tc.wantErrGet {
 					t.Errorf("DB.Get() error = %v, wantErr %v", err, tc.wantErrGet)
 				}

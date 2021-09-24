@@ -1,21 +1,31 @@
 package inmem
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
 )
 
 var _ storage.Storage = (*DB)(nil)
 
-// DB - реализация интерфейса DB c thread-safe inmemory хранилищем (map с RW Mutex).
+type row struct {
+	SessionID   uuid.UUID
+	OriginalURL string
+	Key         string
+}
+
+// DB - реализация интерфейса storage.Storage c thread-safe inmemory хранилищем (структура с RW Mutex).
 type DB struct {
 	sync.RWMutex
 
-	// repo - in-memory хранилище пар ключ-URL
-	repo map[string]string // [key]url
+	// repo - in-memory хранилище
+	repo []row
 
 	// fileName - имя файла, который хранит данные надиске в формате gob. При старте сервиса in-memory
 	// хранилище загружается из файла и по ходу работы периодически переписывает файл, если были изменения.
@@ -34,6 +44,9 @@ type DB struct {
 
 // New инициализирует структуру in-memory хранилища.
 func NewDB(fileName string, interval time.Duration) (*DB, error) {
+	if err := validate(fileName, interval); err != nil {
+		return nil, err
+	}
 	repo, err := initRepo(fileName)
 	if err != nil {
 		return nil, err
@@ -64,38 +77,121 @@ func (db *DB) Close() {
 	db.gobberStop = nil
 }
 
+func validate(filename string, flushinterval time.Duration) error {
+	var err *multierror.Error
+	if filename == "" {
+		err = multierror.Append(err, errors.New("missing file name"))
+	}
+	if flushinterval == 0 {
+		err = multierror.Append(err, errors.New("invalid flush interval"))
+	}
+	return err.ErrorOrNil()
+}
+
 // Store сохраняет в репозитории пару ключ:url.
 // если ключ уже используется, выдается ошибка.
-func (db *DB) Store(key, url string) error {
-	if db.Has(key) {
+func (db *DB) Store(ctx context.Context, id uuid.UUID, key, url string) error {
+	if db.hasKey(ctx, key) {
 		return fmt.Errorf("DB: the key %s already in use", key)
 	}
+	if exitingKey, ok := db.hasURL(url); ok {
+		return &storage.ErrURLArlreadyExists{
+			Key: exitingKey,
+			URL: url,
+		}
+	}
+
 	db.Lock()
 	defer db.Unlock()
-	db.repo[key] = url
+	db.repo = append(db.repo, row{
+		SessionID:   id,
+		OriginalURL: url,
+		Key:         key,
+	})
 	db.isChanged = true
 
 	return nil
 }
 
-// Has проверяет наличие в базе записи с ключом key.
-func (db *DB) Has(key string) bool {
+// hasKey проверяет наличие в базе записи с ключом key.
+func (db *DB) hasKey(ctx context.Context, key string) bool {
+	_, err := db.Get(ctx, key)
+	return err == nil
+}
+
+// hasUrl проверяет в базе записи с переданным url и в случае успеха возвращает ключ
+func (db *DB) hasURL(url string) (key string, ok bool) {
 	db.RLock()
 	defer db.RUnlock()
-	_, ok := db.repo[key]
 
-	return ok
+	for _, rec := range db.repo {
+		if rec.OriginalURL == url {
+			return rec.Key, true
+		}
+	}
+
+	return "", false
 }
 
 // Get извлекает из хранилища длинный url по ключу.
 // Если ключа в базе нет, возвращается ошибка.
-func (db *DB) Get(key string) (string, error) {
+func (db *DB) Get(ctx context.Context, key string) (string, error) {
 	db.RLock()
 	defer db.RUnlock()
-	url, ok := db.repo[key]
-	if !ok {
-		return "", fmt.Errorf("DB: key %s not found", key)
+
+	for _, r := range db.repo {
+		if r.Key == key {
+			return r.OriginalURL, nil
+		}
 	}
 
-	return url, nil
+	return "", fmt.Errorf("DB: key %s not found", key)
+}
+
+// GetAll является реализацией метода GetAll интерфейса storage.Storage
+func (db *DB) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
+	list := make(map[string]string)
+
+	db.RLock()
+	defer db.RUnlock()
+
+	for _, r := range db.repo {
+		if r.SessionID == id {
+			list[r.Key] = r.OriginalURL
+		}
+	}
+	return list
+}
+
+// BatchStore - реализация метода интерфейса storage.Storage
+func (db *DB) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Record) error {
+	db.Lock()
+	defer db.Unlock()
+
+	// В случае обнаружения совпадений отменяем всю транзакцию
+	tmpRepo := make([]row, 0, len(records))
+	for _, rec := range records {
+		for _, r := range db.repo {
+			if r.Key == rec.Key {
+				return fmt.Errorf("DB: key %s already defined", rec.Key)
+			}
+			if r.OriginalURL == rec.OriginalURL {
+				return storage.ErrBatchURLUniqueViolation
+			}
+		}
+		tmpRepo = append(tmpRepo, row{
+			SessionID:   id,
+			OriginalURL: rec.OriginalURL,
+			Key:         rec.Key,
+		})
+	}
+	// делаем "коммит транзакции"
+	db.repo = append(db.repo, tmpRepo...)
+	db.isChanged = true
+
+	return nil
+}
+
+func (db *DB) Ping() error {
+	return nil
 }
