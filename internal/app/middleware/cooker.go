@@ -52,7 +52,7 @@ func analyseCookies(r *http.Request, h hash.Hash) (uuid.UUID, bool) {
 	// проверяем валидность значения uuid
 	id, err := uuid.Parse(cookie.Value)
 	if err != nil {
-		return id, false
+		return uuid.Nil, false
 	}
 
 	// проверяем наличие куки token

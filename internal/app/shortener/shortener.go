@@ -34,6 +34,19 @@ func NewShortener(baseURL string, db storage.Storage) *Shortener {
 	}
 }
 
+// Ping проверяет соединение с базой данных.
+//
+// GET /ping
+func (s Shortener) Ping(w http.ResponseWriter, r *http.Request) {
+	if err := s.db.Ping(); err != nil {
+		log.Printf("storage: ping: %v", err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
+	log.Println("storage: ping OK")
+}
+
 // APIShortenURL принимает в теле запроса JSON-объект в формате {"url": "<some_url>"} и
 // возвращает в ответе объект {"result": "<shorten_url>"}
 //
@@ -62,7 +75,7 @@ func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	shortURL, err := s.shortenURL(w, id, urlReq.URL)
+	shortURL, err := s.shortenURL(w, r, id, urlReq.URL)
 	statusCode := http.StatusCreated
 	if err != nil {
 		log.Printf("APIShortenURL: %v", err)
@@ -108,7 +121,7 @@ func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	shortURL, err := s.shortenURL(w, id, string(body))
+	shortURL, err := s.shortenURL(w, r, id, string(body))
 	if err != nil {
 		log.Printf("shortener: %v", err)
 		var errURLAlreadyExists *storage.ErrURLArlreadyExists
@@ -128,17 +141,18 @@ func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	// nolint:errcheck
 	w.Write([]byte(shortURL))
 }
-func (s Shortener) shortenURL(w http.ResponseWriter, id uuid.UUID, u string) (shortURL string, retErr error) {
+func (s Shortener) shortenURL(w http.ResponseWriter, r *http.Request, id uuid.UUID, u string) (shortURL string, retErr error) {
 	url, err := checkURL(u)
 	if err != nil {
-
 		return "", err
 	}
+
 	// цикл проверки уникальности
+	ctx := r.Context()
 	for {
 		key := generateKey()
-		if _, err := s.db.Get(key); err != nil {
-			err = s.db.Store(id, key, url.String())
+		if _, err := s.db.Get(ctx, key); err != nil {
+			err = s.db.Store(ctx, id, key, url.String())
 			if err != nil {
 				return "", err
 			}
@@ -162,7 +176,7 @@ func (s Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	url, err := s.db.Get(key)
+	url, err := s.db.Get(r.Context(), key)
 	if err != nil {
 		log.Printf("shortener: DecodeURL: could not find url with key %v", key)
 		http.Error(w, "URL not found", http.StatusNotFound)
@@ -190,7 +204,7 @@ func (s Shortener) UserURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list := s.db.GetAll(id)
+	list := s.db.GetAll(r.Context(), id)
 	log.Printf("[INF] shortener: requested entries for id=%s, found %d items.", id, len(list))
 	if len(list) == 0 {
 		w.WriteHeader(http.StatusNoContent)
@@ -254,9 +268,13 @@ func (s Shortener) BatchShortenURL(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	if err = s.db.BatchStore(id, records); err != nil {
+	if err = s.db.BatchStore(r.Context(), id, records); err != nil {
+		if errors.Is(err, storage.ErrBatchURLUniqueViolation) {
+			http.Error(w, err.Error(), http.StatusConflict)
+		} else {
+			http.Error(w, "Something went wrong", http.StatusInternalServerError)
+		}
 		log.Printf("shortener: Batch: cannot store the records: %v", err)
-		http.Error(w, "Something went wrong", http.StatusInternalServerError)
 
 		return
 	}

@@ -1,6 +1,7 @@
 package shortener_test
 
 import (
+	"context"
 	"errors"
 	"io"
 	"math/rand"
@@ -15,7 +16,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/context"
+
+	appContext "github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/context"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
@@ -132,7 +134,7 @@ func TestShortener(t *testing.T) {
 	for _, tc := range testsPost {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest("POST", "/", strings.NewReader(tc.body))
-			ctx := context.WithID(r.Context(), uuid.New())
+			ctx := appContext.WithID(r.Context(), uuid.New())
 			r = r.WithContext(ctx)
 			w := httptest.NewRecorder()
 			h := http.HandlerFunc(s.ShortenURL)
@@ -186,19 +188,19 @@ var _ storage.Storage = (*MockStorage)(nil)
 type MockStorage struct {
 }
 
-func (ms MockStorage) Store(id uuid.UUID, key, url string) error {
+func (ms MockStorage) Store(ctx context.Context, id uuid.UUID, key, url string) error {
 	return nil // имитирует сохранение ключа в базе, ошибок быть не может
 }
 
-func (ms MockStorage) Get(key string) (string, error) {
+func (ms MockStorage) Get(ctx context.Context, key string) (string, error) {
 	return "", errors.New("Mock error") // Ошибка - элемент не найден (используется в цикле проверки уникальности)
 }
 
-func (ms MockStorage) GetAll(id uuid.UUID) map[string]string {
+func (ms MockStorage) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
 	return nil
 }
 
-func (ms MockStorage) BatchStore(id uuid.UUID, records []storage.Record) error {
+func (ms MockStorage) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Record) error {
 	return nil
 }
 
@@ -253,7 +255,7 @@ func TestAPIShorten(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest("POST", "/api/shorten", strings.NewReader(tc.body))
-			ctx := context.WithID(r.Context(), uuid.New())
+			ctx := appContext.WithID(r.Context(), uuid.New())
 			r = r.WithContext(ctx)
 			w := httptest.NewRecorder()
 			h := http.HandlerFunc(s.APIShortenURL)

@@ -3,11 +3,14 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 
 	"github.com/google/uuid"
-	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx"
+	_ "github.com/jackc/pgx/stdlib"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
 )
 
@@ -17,14 +20,14 @@ type Repo struct {
 	db *sql.DB
 }
 
-func NewRepo(dsn string) (*Repo, error) {
+func NewRepo(ctx context.Context, dsn string) (*Repo, error) {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, err
 	}
 
 	r := Repo{db: db}
-	err = r.AutoMigrate()
+	err = r.createTable(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -32,26 +35,27 @@ func NewRepo(dsn string) (*Repo, error) {
 	return &r, nil
 }
 
-func (r Repo) AutoMigrate() error {
+// createTable создает таблицу для хранилища, если она отсутствует.
+func (r Repo) createTable(ctx context.Context) error {
 	const query = `CREATE TABLE IF NOT EXISTS repo (id TEXT, key TEXT UNIQUE, url TEXT UNIQUE);`
-	_, err := r.db.ExecContext(context.Background(), query) // мы не используем передачу контекста, поскольку пока не планируется механизма завершения транзакций извне по какому-либо событию
+	_, err := r.db.ExecContext(ctx, query)
 
 	return err
 }
 
-func (r Repo) DestructiveReset() error {
+// destructiveReset удаляет таблицу из хранилища и пересоздаёт её заново.
+func (r Repo) destructiveReset(ctx context.Context) error {
 	const query = `DROP TABLE IF EXISTS repo;`
-	res, err := r.db.ExecContext(context.Background(), query)
+	res, err := r.db.ExecContext(ctx, query)
 	if err != nil {
 		return err
 	}
 	log.Printf("postgres: drop table: %+v", res)
 
-	return r.AutoMigrate()
+	return r.createTable(ctx)
 }
 
-func (r Repo) Store(id uuid.UUID, key, url string) error {
-	ctx := context.Background()
+func (r Repo) Store(ctx context.Context, id uuid.UUID, key, url string) error {
 	res, err := r.db.ExecContext(ctx,
 		`INSERT INTO repo (id, key, url) VALUES ($1,$2,$3)
 		ON CONFLICT (url) DO NOTHING;`,
@@ -62,7 +66,7 @@ func (r Repo) Store(id uuid.UUID, key, url string) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		row := r.db.QueryRowContext(ctx, "SELECT key FROM repo WHERE url=$1", url)
 		if err = row.Scan(&key); err != nil {
-			return err
+			return fmt.Errorf("postgres: url '%s' already exists in the database, but we cannot get the key: %w", url, err)
 		}
 		return &storage.ErrURLArlreadyExists{ // возвращаем имеющиеся ключ с URL'ом в теле ошибки.
 			Key: key,
@@ -73,9 +77,9 @@ func (r Repo) Store(id uuid.UUID, key, url string) error {
 	return nil
 }
 
-func (r Repo) GetAll(id uuid.UUID) map[string]string {
+func (r Repo) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
 	m := make(map[string]string)
-	rows, err := r.db.QueryContext(context.Background(),
+	rows, err := r.db.QueryContext(ctx,
 		`SELECT key, url FROM repo WHERE id=$1;`,
 		id.String())
 	if err != nil {
@@ -101,8 +105,8 @@ func (r Repo) GetAll(id uuid.UUID) map[string]string {
 
 }
 
-func (r Repo) Get(key string) (string, error) {
-	row := r.db.QueryRowContext(context.Background(),
+func (r Repo) Get(ctx context.Context, key string) (string, error) {
+	row := r.db.QueryRowContext(ctx,
 		`SELECT url FROM repo WHERE key=$1;`, key)
 	var url string
 	err := row.Scan(&url)
@@ -120,8 +124,7 @@ func (r Repo) Ping() error {
 }
 
 // BatchStore - реализация метода интерфейса storage.Storage
-func (r Repo) BatchStore(id uuid.UUID, records []storage.Record) error {
-	ctx := context.Background()
+func (r Repo) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Record) error {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -137,6 +140,10 @@ func (r Repo) BatchStore(id uuid.UUID, records []storage.Record) error {
 
 	for _, rec := range records {
 		if _, err = stmt.ExecContext(ctx, id, rec.Key, rec.OriginalURL); err != nil {
+			var pgErr pgx.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+				return storage.ErrBatchURLUniqueViolation
+			}
 			return err
 		}
 	}

@@ -1,11 +1,14 @@
 package inmem
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
 )
 
@@ -41,6 +44,9 @@ type DB struct {
 
 // New инициализирует структуру in-memory хранилища.
 func NewDB(fileName string, interval time.Duration) (*DB, error) {
+	if err := validate(fileName, interval); err != nil {
+		return nil, err
+	}
 	repo, err := initRepo(fileName)
 	if err != nil {
 		return nil, err
@@ -71,10 +77,21 @@ func (db *DB) Close() {
 	db.gobberStop = nil
 }
 
+func validate(filename string, flushinterval time.Duration) error {
+	var err *multierror.Error
+	if filename == "" {
+		err = multierror.Append(err, errors.New("missing file name"))
+	}
+	if flushinterval == 0 {
+		err = multierror.Append(err, errors.New("invalid flush interval"))
+	}
+	return err.ErrorOrNil()
+}
+
 // Store сохраняет в репозитории пару ключ:url.
 // если ключ уже используется, выдается ошибка.
-func (db *DB) Store(id uuid.UUID, key, url string) error {
-	if db.hasKey(key) {
+func (db *DB) Store(ctx context.Context, id uuid.UUID, key, url string) error {
+	if db.hasKey(ctx, key) {
 		return fmt.Errorf("DB: the key %s already in use", key)
 	}
 	if exitingKey, ok := db.hasURL(url); ok {
@@ -97,8 +114,8 @@ func (db *DB) Store(id uuid.UUID, key, url string) error {
 }
 
 // hasKey проверяет наличие в базе записи с ключом key.
-func (db *DB) hasKey(key string) bool {
-	_, err := db.Get(key)
+func (db *DB) hasKey(ctx context.Context, key string) bool {
+	_, err := db.Get(ctx, key)
 	return err == nil
 }
 
@@ -118,7 +135,7 @@ func (db *DB) hasURL(url string) (key string, ok bool) {
 
 // Get извлекает из хранилища длинный url по ключу.
 // Если ключа в базе нет, возвращается ошибка.
-func (db *DB) Get(key string) (string, error) {
+func (db *DB) Get(ctx context.Context, key string) (string, error) {
 	db.RLock()
 	defer db.RUnlock()
 
@@ -132,7 +149,7 @@ func (db *DB) Get(key string) (string, error) {
 }
 
 // GetAll является реализацией метода GetAll интерфейса storage.Storage
-func (db *DB) GetAll(id uuid.UUID) map[string]string {
+func (db *DB) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
 	list := make(map[string]string)
 
 	db.RLock()
@@ -147,24 +164,30 @@ func (db *DB) GetAll(id uuid.UUID) map[string]string {
 }
 
 // BatchStore - реализация метода интерфейса storage.Storage
-func (db *DB) BatchStore(id uuid.UUID, records []storage.Record) error {
+func (db *DB) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Record) error {
 	db.Lock()
 	defer db.Unlock()
 
-	// не используем методы Has и Store, чтобы много раз не лочить / разлочивать... Или ну его?
+	// В случае обнаружения совпадений отменяем всю транзакцию
+	tmpRepo := make([]row, 0, len(records))
 	for _, rec := range records {
 		for _, r := range db.repo {
 			if r.Key == rec.Key {
 				return fmt.Errorf("DB: key %s already defined", rec.Key)
 			}
+			if r.OriginalURL == rec.OriginalURL {
+				return storage.ErrBatchURLUniqueViolation
+			}
 		}
-		db.repo = append(db.repo, row{
+		tmpRepo = append(tmpRepo, row{
 			SessionID:   id,
 			OriginalURL: rec.OriginalURL,
 			Key:         rec.Key,
 		})
-		db.isChanged = true
 	}
+	// делаем "коммит транзакции"
+	db.repo = append(db.repo, tmpRepo...)
+	db.isChanged = true
 
 	return nil
 }

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/hashicorp/go-multierror"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/middleware"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
@@ -20,10 +21,11 @@ import (
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/postgres"
 )
 
+// Значения по умолчанию
 const (
 	flushInterval = 10 * time.Second
 
-	secret = "секретный ключ, которым шифруются подписи"
+	defaultSecret = "секретный ключ, которым шифруются подписи"
 
 	fileNameDefault = "localhost.db"
 	baseURLDefault  = "http://localhost:8080"
@@ -32,43 +34,57 @@ const (
 	dsnDefault = "host=localhost port=5432 user=postgres password=qwe123 dbname=postgres"
 )
 
-// config определяет базовую конйигурацию сервиса
+// Провайдеры хранилища
+const (
+	dbInmem    = "inmem"
+	dbPostgres = "postgres"
+)
+
+// config определяет базовую конйигурацию сервиса.
 type config struct {
-	baseURL       string
-	srvAddr       string
+	baseURL string
+	srvAddr string
+	secret  string
+
+	dbType string
+
 	fileName      string
 	flushInterval time.Duration
-	dsn           string
-	inMemory      bool
+
+	dsn string
+}
+
+func (cfg config) String() string {
+	var b strings.Builder
+	b.WriteString("baseURL='" + cfg.baseURL + "'")
+	b.WriteString(" srvAddr='" + cfg.srvAddr + "'")
+	b.WriteString(" secret='*****'")
+	b.WriteString(" dbType='" + cfg.dbType + "'")
+	if cfg.fileName != "" {
+		b.WriteString(" fileName='" + cfg.fileName + "'")
+	}
+	if cfg.flushInterval != 0 {
+		b.WriteString(" flushInterval=" + cfg.flushInterval.String())
+	}
+	if cfg.dsn != "" {
+		b.WriteString(" dsn='" + cfg.dsn + "'")
+	}
+	return b.String()
 }
 
 // validate проверяет конфигурацию и выдает ошибку, если обнаруживает пустые поля.
-func (cfg config) validate() error {
-	problems := make([]string, 0, 4)
-
+func (cfg config) validate() (retErr error) {
 	if cfg.baseURL == "" {
-		problems = append(problems, "base URL")
+		retErr = multierror.Append(retErr, errors.New("Missing base URL"))
 	}
 	if cfg.srvAddr == "" {
-		problems = append(problems, "server address")
+		retErr = multierror.Append(retErr, errors.New("Mising server address"))
 	}
-	if cfg.fileName == "" && cfg.inMemory {
-		problems = append(problems, "storage file name")
-	}
-	if cfg.flushInterval == 0 && cfg.inMemory {
-		problems = append(problems, "flushing interval")
-	}
-	if cfg.dsn == "" && !cfg.inMemory {
-		problems = append(problems, "DSN")
+	if cfg.dbType != dbInmem && cfg.dbType != dbPostgres {
+		retErr = multierror.Append(retErr, errors.New("Invalid storage type"))
 	}
 
-	if len(problems) != 0 {
-		errMsg := "Invalid config: " + strings.Join(problems, ", ") + " not set."
-
-		return errors.New(errMsg)
-	}
-
-	return nil
+	return
 }
 
 func main() {
@@ -78,42 +94,31 @@ func main() {
 	)
 	err := cfg.validate()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("config: %s", err)
 	}
-	log.Printf("Server configuration: %+v", cfg)
+	log.Printf("Server configuration: %s", cfg)
 
 	rand.Seed(time.Now().UnixNano())
 
 	var db storage.Storage
-	if cfg.inMemory {
+	switch cfg.dbType {
+	case dbInmem:
 		log.Println("Connecting to in-memory storage...")
 		db, err = inmem.NewDB(cfg.fileName, cfg.flushInterval)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer db.Close()
-	} else {
-		log.Println("Connecting to Postgres engine...")
-		db, err = postgres.NewRepo(cfg.dsn)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer db.Close()
+	case dbPostgres:
+		log.Print("Connecting to Postgres engine...")
+		db, err = postgres.NewRepo(context.Background(), cfg.dsn)
 	}
+	if err != nil {
+		log.Fatalf("Connect to db failed: %v", err)
+	}
+	defer db.Close()
 
 	s := shortener.NewShortener(cfg.baseURL, db)
 
 	router := mux.NewRouter()
 
-	router.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		if err := db.Ping(); err != nil {
-			log.Printf("postgres: ping: %v", err)
-			http.Error(w, "Something went wrong", http.StatusInternalServerError)
-
-			return
-		}
-		log.Println("postgres: ping OK")
-	}).Methods(http.MethodGet)
+	router.HandleFunc("/ping", s.Ping).Methods(http.MethodGet)
 
 	router.HandleFunc("/{id}", s.DecodeURL).Methods(http.MethodGet)
 	router.HandleFunc("/", s.ShortenURL).Methods(http.MethodPost)
@@ -121,7 +126,7 @@ func main() {
 	router.HandleFunc("/api/shorten/batch", s.BatchShortenURL).Methods(http.MethodPost)
 	router.HandleFunc("/user/urls", s.UserURLs).Methods(http.MethodGet)
 
-	router.Use(middleware.CookieMdlw(secret), middleware.GzipMdlw)
+	router.Use(middleware.CookieMdlw(cfg.secret), middleware.GzipMdlw)
 
 	server := http.Server{
 		Addr:    cfg.srvAddr,
@@ -151,7 +156,6 @@ func newConfig(opts ...configOption) config {
 	cfg := config{
 		baseURL:       baseURLDefault,
 		srvAddr:       srvAddrDefault,
-		inMemory:      true,
 		fileName:      fileNameDefault,
 		flushInterval: flushInterval,
 		dsn:           "", // значения по умолчанию будут внесены функцией newConfig.
@@ -161,19 +165,20 @@ func newConfig(opts ...configOption) config {
 		fn(&cfg)
 	}
 
-	// Если пользователь передал DSN для Postgres, используем Postgres
+	// Если пользователь передал DSN для Postgres, используем Postgres, игнорируя флаги.
 	if cfg.dsn != "" {
-		cfg.inMemory = false
+		cfg.dbType = dbPostgres
 	}
 
-	if !cfg.inMemory {
-		// если пользователь указал использование postgres, но не передал данных DSN, используются DSN по умолчанию.
+	switch cfg.dbType {
+	case dbPostgres:
 		if cfg.dsn == "" {
 			cfg.dsn = dsnDefault
 		}
-		// обнуляем поля конфигурации, не нужные для работы postgres
 		cfg.fileName = ""
 		cfg.flushInterval = 0
+	case dbInmem:
+		cfg.dsn = ""
 	}
 
 	return cfg
@@ -183,10 +188,22 @@ func withFlags() configOption {
 	return func(cfg *config) {
 		flag.StringVar(&cfg.srvAddr, "a", srvAddrDefault, "Server address")
 		flag.StringVar(&cfg.baseURL, "b", baseURLDefault, "Base URL")
+		flag.StringVar(&cfg.secret, "p", "*****", "Secret key for hashing cookies") // чтобы ключ по умолчанию не отображался в usage, придется действовать из-за угла))
+		flag.StringVar(&cfg.dbType, "s", dbInmem, "Storage type (default inmem)\n- inmem\t\tin-memory storage periodically written to .gob file\n"+
+			"- postgres\tPostgreSQL database")
 		flag.StringVar(&cfg.fileName, "f", fileNameDefault, "File storage path")
 		flag.StringVar(&cfg.dsn, "d", "", "Database DSN")
-		flag.BoolVar(&cfg.inMemory, "i", true, "Use in-memory repository instead of postgres DB.")
 		flag.Parse()
+
+		setByUser := false
+		flag.Visit(func(f *flag.Flag) {
+			if f.Name == "p" {
+				setByUser = true
+			}
+		})
+		if !setByUser {
+			cfg.secret = defaultSecret
+		}
 	}
 }
 
@@ -197,6 +214,7 @@ func withEnv() configOption {
 			"SERVER_ADDRESS":    &cfg.srvAddr,
 			"FILE_STORAGE_PATH": &cfg.fileName,
 			"DATABASE_DSN":      &cfg.dsn,
+			"HASH_KEY":          &cfg.secret,
 		}
 
 		for v := range env {

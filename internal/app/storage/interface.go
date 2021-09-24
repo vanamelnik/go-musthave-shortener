@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -10,15 +11,15 @@ import (
 type (
 	Storage interface {
 		// Store сохраняет в хранилище пару ключ:url и возвращает ошибку, если ключ уже используется.
-		Store(id uuid.UUID, key, url string) error
+		Store(ctx context.Context, id uuid.UUID, key, url string) error
 		// Get по ключу возвращает значение, либо ошибку, если ключа в базе нет.
-		Get(key string) (string, error)
+		Get(ctx context.Context, key string) (string, error)
 		// GetAll возвращает все пары <key>:<URL> созданные данным пользователем.
 		// Если ни одной записи не найдено, возвращается пустая мапа.
-		GetAll(id uuid.UUID) map[string]string
+		GetAll(ctx context.Context, id uuid.UUID) map[string]string
 		// BatchStore сохраняет в хранилище пакет с парами <OriginalURL> : <Key> из передаваемых объектов Record.
 		// Ошибка выдается, если хотя бы один ключ не уникален.
-		BatchStore(id uuid.UUID, records []Record) error
+		BatchStore(ctx context.Context, id uuid.UUID, records []Record) error
 		// Close  завершает работу хранилища
 		Close()
 		// Ping проверяет соединение с хранилищем
@@ -35,6 +36,8 @@ type (
 		Key string
 	}
 
+	storageError string
+
 	// ErrURLArlreadyExists возвращается при попытке сохранить в базу URL, который в ней уже сохранён.
 	ErrURLArlreadyExists struct {
 		Key string
@@ -42,6 +45,15 @@ type (
 	}
 )
 
+func (e storageError) Error() string {
+	return string(e)
+}
+
 func (err ErrURLArlreadyExists) Error() string {
 	return fmt.Sprintf("Url %s already exists in the database", err.URL)
 }
+
+const (
+	// ErrBatchURLUniqueViolation возвращается при попытке пакетного сохранения URL, если некоторые из них уже есть в базе
+	ErrBatchURLUniqueViolation storageError = "Some of URLs is already exists in the database"
+)
