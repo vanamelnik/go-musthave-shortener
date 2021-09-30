@@ -204,6 +204,10 @@ func (ms MockStorage) BatchStore(ctx context.Context, id uuid.UUID, records []st
 	return nil
 }
 
+func (ms MockStorage) BatchDelete(ctx context.Context, id uuid.UUID, keys []string) error {
+	return nil
+}
+
 func (ms MockStorage) Close() {}
 
 func (ms MockStorage) Ping() error {
