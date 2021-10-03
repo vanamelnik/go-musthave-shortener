@@ -56,22 +56,23 @@ func (r Repo) destructiveReset(ctx context.Context) error { //nolint unused
 }
 
 func (r Repo) Store(ctx context.Context, id uuid.UUID, key, url string) error {
-	res, err := r.db.ExecContext(ctx,
-		`INSERT INTO repo (id, key, url) VALUES ($1,$2,$3)
-		ON CONFLICT (url) DO NOTHING;`,
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO repo (id, key, url) VALUES ($1,$2,$3);`,
 		id.String(), key, url)
 	if err != nil {
+		var pgErr pgx.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation { // Если url уже имеется в таблице...
+			row := r.db.QueryRowContext(ctx, "SELECT key FROM repo WHERE url=$1", url)
+			if err = row.Scan(&key); err != nil {
+				return fmt.Errorf("postgres: url '%s' already exists in the database, but we cannot get the key: %w", url, err)
+			}
+			return &storage.ErrURLArlreadyExists{ // возвращаем имеющиеся ключ с URL'ом в теле ошибки.
+				Key: key,
+				URL: url,
+			}
+		}
+
 		return fmt.Errorf("postgres: %w", err)
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		row := r.db.QueryRowContext(ctx, "SELECT key FROM repo WHERE url=$1", url)
-		if err = row.Scan(&key); err != nil {
-			return fmt.Errorf("postgres: url '%s' already exists in the database, but we cannot get the key: %w", url, err)
-		}
-		return &storage.ErrURLArlreadyExists{ // возвращаем имеющиеся ключ с URL'ом в теле ошибки.
-			Key: key,
-			URL: url,
-		}
 	}
 
 	return nil
@@ -145,8 +146,6 @@ func (r Repo) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Re
 	for _, rec := range records {
 		if _, err = stmt.ExecContext(ctx, id, rec.Key, rec.OriginalURL); err != nil {
 			var pgErr pgx.PgError
-			// TODO: в связи с тем, что в сервисе реализовано мягкое удаление, у нас есть проблема -
-			// невозможно будет повторно сокращать URL'ы, которые были удалены, т.к. они по-прежнему присутствуют в индексе таблицы.
 			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 				return storage.ErrBatchURLUniqueViolation
 			}
