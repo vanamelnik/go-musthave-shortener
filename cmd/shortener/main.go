@@ -206,10 +206,10 @@ func withFlags() configOption {
 			"- postgres\tPostgreSQL database")
 		flag.StringVar(&cfg.fileName, "f", fileNameDefault, "File storage path")
 		flag.StringVar(&cfg.dsn, "d", "", "Database DSN")
-		flag.IntVar(&flInt, "F", 90, "Flush interval for accumulate data to delete in seconds")
+		flag.IntVar(&flInt, "F", int(deleteFlushInterval/time.Millisecond), "Flush interval for accumulate data to delete in milliseconds")
 		flag.Parse()
 
-		cfg.deleteFlushInterval = time.Second * time.Duration(flInt)
+		cfg.deleteFlushInterval = time.Millisecond * time.Duration(flInt)
 		setByUser := false
 		flag.Visit(func(f *flag.Flag) {
 			if f.Name == "p" {
