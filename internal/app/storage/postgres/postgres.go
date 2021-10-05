@@ -37,8 +37,14 @@ func NewRepo(ctx context.Context, dsn string) (*Repo, error) {
 
 // createTable создает таблицу для хранилища, если она отсутствует.
 func (r Repo) createTable(ctx context.Context) error {
-	const query = `CREATE TABLE IF NOT EXISTS repo (id TEXT, key TEXT UNIQUE, url TEXT UNIQUE, deleted BOOLEAN DEFAULT FALSE);`
-	_, err := r.db.ExecContext(ctx, query)
+	const queryCreate = `CREATE TABLE IF NOT EXISTS repo (id TEXT, key TEXT UNIQUE, url TEXT, deleted BOOLEAN DEFAULT FALSE);`
+	const queryIndex = `CREATE UNIQUE INDEX IF NOT EXISTS url_not_deleted ON repo(url) WHERE NOT deleted;`
+	_, err := r.db.ExecContext(ctx, queryCreate)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.ExecContext(ctx, queryIndex)
 
 	return err
 }
@@ -62,7 +68,7 @@ func (r Repo) Store(ctx context.Context, id uuid.UUID, key, url string) error {
 	if err != nil {
 		var pgErr pgx.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation { // Если url уже имеется в таблице...
-			row := r.db.QueryRowContext(ctx, "SELECT key FROM repo WHERE url=$1", url)
+			row := r.db.QueryRowContext(ctx, "SELECT key FROM repo WHERE url=$1 AND NOT deleted;", url)
 			if err = row.Scan(&key); err != nil {
 				return fmt.Errorf("postgres: url '%s' already exists in the database, but we cannot get the key: %w", url, err)
 			}

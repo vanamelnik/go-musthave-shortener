@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/context"
+	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/dataloader"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
 
 	"github.com/gorilla/mux"
@@ -25,13 +26,16 @@ const keyLength = 8
 type Shortener struct {
 	db      storage.Storage
 	BaseURL string
+
+	dl dataloader.DataLoader
 }
 
 // NewShortener инициализирует новую структуру Shortener с использованием заданного хранилища.
-func NewShortener(baseURL string, db storage.Storage) *Shortener {
+func NewShortener(baseURL string, db storage.Storage, dl dataloader.DataLoader) *Shortener {
 	return &Shortener{
 		BaseURL: baseURL,
 		db:      db,
+		dl:      dl,
 	}
 }
 
@@ -334,7 +338,7 @@ func (s Shortener) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = s.db.BatchDelete(r.Context(), id, keys); err != nil {
+	if err = s.dl.BatchDelete(r.Context(), id, keys); err != nil {
 		log.Printf("shortener: delete: %v", err)
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)
 

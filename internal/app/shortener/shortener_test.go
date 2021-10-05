@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appContext "github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/context"
+	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/dataloader"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
@@ -128,7 +129,7 @@ func TestShortener(t *testing.T) {
 		require.NoError(t, os.Remove("tmp.db"))
 	}()
 
-	s := shortener.NewShortener("http://localhost:8080", db)
+	s := shortener.NewShortener("http://localhost:8080", db, dataloader.DataLoader{})
 
 	// запускаем тесты POST
 	for _, tc := range testsPost {
@@ -255,7 +256,7 @@ func TestAPIShorten(t *testing.T) {
 			},
 		},
 	}
-	s := shortener.NewShortener("http://localhost:8080", &MockStorage{})
+	s := shortener.NewShortener("http://localhost:8080", &MockStorage{}, dataloader.DataLoader{})
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest("POST", "/api/shorten", strings.NewReader(tc.body))

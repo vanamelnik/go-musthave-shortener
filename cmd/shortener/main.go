@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-multierror"
+	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/dataloader"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/middleware"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
@@ -23,7 +24,9 @@ import (
 
 // Значения по умолчанию
 const (
-	flushInterval = 10 * time.Second
+	inmemFlushInterval = 10 * time.Second
+
+	deleteFlushInterval = 90 * time.Second
 
 	defaultSecret = "секретный ключ, которым шифруются подписи"
 
@@ -48,8 +51,10 @@ type config struct {
 
 	dbType string
 
-	fileName      string
-	flushInterval time.Duration
+	fileName           string
+	inmemFlushInterval time.Duration
+
+	deleteFlushInterval time.Duration
 
 	dsn string
 }
@@ -60,15 +65,17 @@ func (cfg config) String() string {
 	b.WriteString(" srvAddr='" + cfg.srvAddr + "'")
 	b.WriteString(" secret='*****'")
 	b.WriteString(" dbType='" + cfg.dbType + "'")
+	b.WriteString(" deleteFlushInterval=" + cfg.deleteFlushInterval.String())
 	if cfg.fileName != "" {
 		b.WriteString(" fileName='" + cfg.fileName + "'")
 	}
-	if cfg.flushInterval != 0 {
-		b.WriteString(" flushInterval=" + cfg.flushInterval.String())
+	if cfg.inmemFlushInterval != 0 {
+		b.WriteString(" inmemFlushInterval=" + cfg.inmemFlushInterval.String())
 	}
 	if cfg.dsn != "" {
 		b.WriteString(" dsn='" + cfg.dsn + "'")
 	}
+
 	return b.String()
 }
 
@@ -104,7 +111,7 @@ func main() {
 	switch cfg.dbType {
 	case dbInmem:
 		log.Println("Connecting to in-memory storage...")
-		db, err = inmem.NewDB(cfg.fileName, cfg.flushInterval)
+		db, err = inmem.NewDB(cfg.fileName, cfg.inmemFlushInterval)
 	case dbPostgres:
 		log.Print("Connecting to Postgres engine...")
 		db, err = postgres.NewRepo(context.Background(), cfg.dsn)
@@ -114,7 +121,10 @@ func main() {
 	}
 	defer db.Close()
 
-	s := shortener.NewShortener(cfg.baseURL, db)
+	dl := dataloader.NewDataLoader(context.Background(), db.BatchDelete, cfg.deleteFlushInterval)
+	defer dl.Close()
+
+	s := shortener.NewShortener(cfg.baseURL, db, dl)
 
 	router := mux.NewRouter()
 
@@ -155,11 +165,12 @@ type configOption func(*config)
 // поля при помощи функций configOption.
 func newConfig(opts ...configOption) config {
 	cfg := config{
-		baseURL:       baseURLDefault,
-		srvAddr:       srvAddrDefault,
-		fileName:      fileNameDefault,
-		flushInterval: flushInterval,
-		dsn:           "", // значения по умолчанию будут внесены функцией newConfig.
+		baseURL:             baseURLDefault,
+		srvAddr:             srvAddrDefault,
+		fileName:            fileNameDefault,
+		inmemFlushInterval:  inmemFlushInterval,
+		deleteFlushInterval: deleteFlushInterval,
+		dsn:                 "", // значения по умолчанию будут внесены функцией newConfig.
 	}
 
 	for _, fn := range opts {
@@ -177,7 +188,7 @@ func newConfig(opts ...configOption) config {
 			cfg.dsn = dsnDefault
 		}
 		cfg.fileName = ""
-		cfg.flushInterval = 0
+		cfg.inmemFlushInterval = 0
 	case dbInmem:
 		cfg.dsn = ""
 	}
@@ -187,6 +198,7 @@ func newConfig(opts ...configOption) config {
 
 func withFlags() configOption {
 	return func(cfg *config) {
+		var flInt int
 		flag.StringVar(&cfg.srvAddr, "a", srvAddrDefault, "Server address")
 		flag.StringVar(&cfg.baseURL, "b", baseURLDefault, "Base URL")
 		flag.StringVar(&cfg.secret, "p", "*****", "Secret key for hashing cookies") // чтобы ключ по умолчанию не отображался в usage, придется действовать из-за угла))
@@ -194,8 +206,10 @@ func withFlags() configOption {
 			"- postgres\tPostgreSQL database")
 		flag.StringVar(&cfg.fileName, "f", fileNameDefault, "File storage path")
 		flag.StringVar(&cfg.dsn, "d", "", "Database DSN")
+		flag.IntVar(&flInt, "F", 90, "Flush interval for accumulate data to delete in seconds")
 		flag.Parse()
 
+		cfg.deleteFlushInterval = time.Second * time.Duration(flInt)
 		setByUser := false
 		flag.Visit(func(f *flag.Flag) {
 			if f.Name == "p" {
