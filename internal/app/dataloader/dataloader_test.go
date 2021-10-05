@@ -160,7 +160,7 @@ func TestDataLoader(t *testing.T) {
 		}
 	}
 
-	dl := dataloader.NewDataLoader(ctx, db.BatchDelete, time.Second*5)
+	dl := dataloader.NewDataLoader(ctx, db.BatchDelete, time.Millisecond)
 	defer dl.Close()
 
 	t.Log("Running delete tasks...")
@@ -168,12 +168,13 @@ func TestDataLoader(t *testing.T) {
 		delTask := delTask
 		go func() {
 			t.Log(delTask.name)
+			//nolint:errcheck
 			dl.BatchDelete(ctx, delTask.id, delTask.keys)
 		}()
 	}
 
-	t.Log("Waiting 7 seconds...")
-	time.Sleep(7 * time.Second)
+	t.Log("Waiting...")
+	time.Sleep(5 * time.Millisecond)
 
 	t.Log("Checking keys which have not been deleted...")
 	for _, tc := range tt {

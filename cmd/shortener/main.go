@@ -24,9 +24,9 @@ import (
 
 // Значения по умолчанию
 const (
-	inmemFlushInterval = 0
+	inmemFlushInterval = 10 * time.Second
 
-	deleteFlushInterval = 1 * time.Second
+	deleteFlushInterval = time.Millisecond
 
 	defaultSecret = "секретный ключ, которым шифруются подписи"
 
