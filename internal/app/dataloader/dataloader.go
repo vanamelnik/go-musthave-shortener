@@ -87,6 +87,7 @@ func (dl DataLoader) aggregator() {
 		select {
 		case task := <-dl.deleteCh: // пришли данные, надо их засунуть в накопитель
 			dl.tasks[task.id] = append(dl.tasks[task.id], task.keys...)
+			log.Printf("dataloader: got %d keys to delete from id %s", len(task.keys), task.id)
 		case <-dl.ticker.C: // время удалять записи!
 			dl.flush()
 		case <-dl.stopCh: // пора и честь знать...
