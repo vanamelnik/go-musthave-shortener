@@ -24,7 +24,7 @@ import (
 
 // Значения по умолчанию
 const (
-	inmemFlushInterval = 10 * time.Millisecond
+	inmemFlushInterval = time.Millisecond
 
 	deleteFlushInterval = 1 * time.Second
 
