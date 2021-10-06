@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/context"
+	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/dataloader"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
 
 	"github.com/gorilla/mux"
@@ -24,13 +25,16 @@ const keyLength = 8
 type Shortener struct {
 	db      storage.Storage
 	BaseURL string
+
+	dl dataloader.DataLoader
 }
 
 // NewShortener инициализирует новую структуру Shortener с использованием заданного хранилища.
-func NewShortener(baseURL string, db storage.Storage) *Shortener {
+func NewShortener(baseURL string, db storage.Storage, dl dataloader.DataLoader) *Shortener {
 	return &Shortener{
 		BaseURL: baseURL,
 		db:      db,
+		dl:      dl,
 	}
 }
 
@@ -178,9 +182,13 @@ func (s Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
 	}
 	url, err := s.db.Get(r.Context(), key)
 	if err != nil {
-		log.Printf("shortener: DecodeURL: could not find url with key %v", key)
-		http.Error(w, "URL not found", http.StatusNotFound)
+		log.Printf("shortener: DecodeURL: could not find url with key %v: %v", key, err)
+		if errors.Is(err, storage.ErrDeleted) {
+			http.Error(w, "URL was deleted", http.StatusGone)
+			return
+		}
 
+		http.Error(w, "URL not found", http.StatusNotFound)
 		return
 	}
 	log.Printf("shortener: DecodeURL: redirecting to %v (key: %v)", url, key)
@@ -299,6 +307,44 @@ func (s Shortener) BatchShortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("shortener: Batch: successfully added %d records to the repository", len(records))
+}
+
+// DeleteURLs
+//
+// DELETE /api/user/urls
+func (s Shortener) DeleteURLs(w http.ResponseWriter, r *http.Request) {
+	id, err := context.ID(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
+	if err != nil {
+		log.Printf("shortener: delete: %v", err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
+	defer r.Body.Close()
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("shortener: delete: %v", err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
+
+	var keys []string
+	if err := json.Unmarshal(b, &keys); err != nil {
+		log.Printf("shortener: delete: %v", err)
+		http.Error(w, "Wrong format", http.StatusBadRequest)
+
+		return
+	}
+
+	if err := s.dl.BatchDelete(r.Context(), id, keys); err != nil {
+		log.Printf("shortener: delete: %v", err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 // generateKey создает рандомную строку из строчных букв и цифр. Длина строки задана в глобальной переменной keyLength.

@@ -18,6 +18,7 @@ type row struct {
 	SessionID   uuid.UUID
 	OriginalURL string
 	Key         string
+	Deleted     bool
 }
 
 // DB - реализация интерфейса storage.Storage c thread-safe inmemory хранилищем (структура с RW Mutex).
@@ -125,7 +126,7 @@ func (db *DB) hasURL(url string) (key string, ok bool) {
 	defer db.RUnlock()
 
 	for _, rec := range db.repo {
-		if rec.OriginalURL == url {
+		if rec.OriginalURL == url && !rec.Deleted {
 			return rec.Key, true
 		}
 	}
@@ -141,6 +142,9 @@ func (db *DB) Get(ctx context.Context, key string) (string, error) {
 
 	for _, r := range db.repo {
 		if r.Key == key {
+			if r.Deleted {
+				return "", storage.ErrDeleted
+			}
 			return r.OriginalURL, nil
 		}
 	}
@@ -156,7 +160,7 @@ func (db *DB) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
 	defer db.RUnlock()
 
 	for _, r := range db.repo {
-		if r.SessionID == id {
+		if r.SessionID == id && !r.Deleted {
 			list[r.Key] = r.OriginalURL
 		}
 	}
@@ -188,6 +192,22 @@ func (db *DB) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Re
 	// делаем "коммит транзакции"
 	db.repo = append(db.repo, tmpRepo...)
 	db.isChanged = true
+
+	return nil
+}
+
+func (db *DB) BatchDelete(ctx context.Context, id uuid.UUID, keys []string) error {
+	db.Lock()
+	defer db.Unlock()
+
+	for _, key := range keys {
+		for i, r := range db.repo {
+			if r.Key == key && r.SessionID == id {
+				db.repo[i].Deleted = true
+				db.isChanged = true
+			}
+		}
+	}
 
 	return nil
 }

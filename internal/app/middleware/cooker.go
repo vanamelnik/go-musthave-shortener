@@ -92,8 +92,8 @@ func newSession(w http.ResponseWriter, h hash.Hash) (uuid.UUID, error) {
 	token := hex.EncodeToString(h.Sum(nil))
 	log.Printf("CookieMdlw: successfully created new session id=%s", id)
 
-	http.SetCookie(w, &http.Cookie{Name: "uuid", Value: id.String()})
-	http.SetCookie(w, &http.Cookie{Name: "token", Value: token})
+	http.SetCookie(w, &http.Cookie{Name: "uuid", Path: "/", Value: id.String()})
+	http.SetCookie(w, &http.Cookie{Name: "token", Path: "/", Value: token})
 
 	return id, nil
 }

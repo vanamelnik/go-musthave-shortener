@@ -37,14 +37,20 @@ func NewRepo(ctx context.Context, dsn string) (*Repo, error) {
 
 // createTable создает таблицу для хранилища, если она отсутствует.
 func (r Repo) createTable(ctx context.Context) error {
-	const query = `CREATE TABLE IF NOT EXISTS repo (id TEXT, key TEXT UNIQUE, url TEXT UNIQUE);`
-	_, err := r.db.ExecContext(ctx, query)
+	const queryCreate = `CREATE TABLE IF NOT EXISTS repo (id TEXT, key TEXT UNIQUE, url TEXT, deleted BOOLEAN DEFAULT FALSE);`
+	const queryIndex = `CREATE UNIQUE INDEX IF NOT EXISTS url_not_deleted ON repo(url) WHERE NOT deleted;`
+	_, err := r.db.ExecContext(ctx, queryCreate)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.ExecContext(ctx, queryIndex)
 
 	return err
 }
 
 // destructiveReset удаляет таблицу из хранилища и пересоздаёт её заново.
-func (r Repo) destructiveReset(ctx context.Context) error {
+func (r Repo) destructiveReset(ctx context.Context) error { //nolint unused
 	const query = `DROP TABLE IF EXISTS repo;`
 	res, err := r.db.ExecContext(ctx, query)
 	if err != nil {
@@ -56,22 +62,23 @@ func (r Repo) destructiveReset(ctx context.Context) error {
 }
 
 func (r Repo) Store(ctx context.Context, id uuid.UUID, key, url string) error {
-	res, err := r.db.ExecContext(ctx,
-		`INSERT INTO repo (id, key, url) VALUES ($1,$2,$3)
-		ON CONFLICT (url) DO NOTHING;`,
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO repo (id, key, url) VALUES ($1,$2,$3);`,
 		id.String(), key, url)
 	if err != nil {
+		var pgErr pgx.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation { // Если url уже имеется в таблице...
+			row := r.db.QueryRowContext(ctx, "SELECT key FROM repo WHERE url=$1 AND NOT deleted;", url)
+			if err = row.Scan(&key); err != nil {
+				return fmt.Errorf("postgres: url '%s' already exists in the database, but we cannot get the key: %w", url, err)
+			}
+			return &storage.ErrURLArlreadyExists{ // возвращаем имеющиеся ключ с URL'ом в теле ошибки.
+				Key: key,
+				URL: url,
+			}
+		}
+
 		return fmt.Errorf("postgres: %w", err)
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		row := r.db.QueryRowContext(ctx, "SELECT key FROM repo WHERE url=$1", url)
-		if err = row.Scan(&key); err != nil {
-			return fmt.Errorf("postgres: url '%s' already exists in the database, but we cannot get the key: %w", url, err)
-		}
-		return &storage.ErrURLArlreadyExists{ // возвращаем имеющиеся ключ с URL'ом в теле ошибки.
-			Key: key,
-			URL: url,
-		}
 	}
 
 	return nil
@@ -80,7 +87,7 @@ func (r Repo) Store(ctx context.Context, id uuid.UUID, key, url string) error {
 func (r Repo) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
 	m := make(map[string]string)
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT key, url FROM repo WHERE id=$1;`,
+		`SELECT key, url FROM repo WHERE id=$1 AND NOT deleted;`,
 		id.String())
 	if err != nil {
 		log.Printf("postgres: %v", err)
@@ -107,9 +114,13 @@ func (r Repo) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
 
 func (r Repo) Get(ctx context.Context, key string) (string, error) {
 	row := r.db.QueryRowContext(ctx,
-		`SELECT url FROM repo WHERE key=$1;`, key)
+		`SELECT url, deleted FROM repo WHERE key=$1;`, key)
 	var url string
-	err := row.Scan(&url)
+	var deleted bool
+	err := row.Scan(&url, &deleted)
+	if deleted {
+		return "", storage.ErrDeleted
+	}
 
 	return url, err
 }
@@ -148,5 +159,27 @@ func (r Repo) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Re
 		}
 	}
 
+	return tx.Commit()
+}
+
+func (r Repo) BatchDelete(ctx context.Context, id uuid.UUID, keys []string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	// nolint:errcheck
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, "UPDATE repo SET deleted=TRUE WHERE id=$1 AND key=$2;")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, key := range keys {
+		if _, err = stmt.ExecContext(ctx, id, key); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }

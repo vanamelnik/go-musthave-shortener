@@ -20,6 +20,9 @@ type (
 		// BatchStore сохраняет в хранилище пакет с парами <OriginalURL> : <Key> из передаваемых объектов Record.
 		// Ошибка выдается, если хотя бы один ключ не уникален.
 		BatchStore(ctx context.Context, id uuid.UUID, records []Record) error
+		// BatchDelete производит мягкое удаление записей из хранилища с ключами <keys>, если их создал пользователь
+		// с указанным id.
+		BatchDelete(ctx context.Context, id uuid.UUID, keys []string) error
 		// Close  завершает работу хранилища
 		Close()
 		// Ping проверяет соединение с хранилищем
@@ -54,6 +57,9 @@ func (err ErrURLArlreadyExists) Error() string {
 }
 
 const (
-	// ErrBatchURLUniqueViolation возвращается при попытке пакетного сохранения URL, если некоторые из них уже есть в базе
+	// ErrBatchURLUniqueViolation возвращается при попытке пакетного сохранения URL, если некоторые из них уже есть в базе.
 	ErrBatchURLUniqueViolation storageError = "Some of URLs is already exists in the database"
+
+	// ErrDeleted возвращается, когда запрашиваемый ключ был удален.
+	ErrDeleted storageError = "Key was deleted"
 )
