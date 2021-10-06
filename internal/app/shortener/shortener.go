@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/context"
@@ -330,15 +329,15 @@ func (s Shortener) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	keys, err := parseJSArray(string(b))
-	if err != nil {
+	var keys []string
+	if err := json.Unmarshal(b, &keys); err != nil {
 		log.Printf("shortener: delete: %v", err)
 		http.Error(w, "Wrong format", http.StatusBadRequest)
 
 		return
 	}
 
-	if err = s.dl.BatchDelete(r.Context(), id, keys); err != nil {
+	if err := s.dl.BatchDelete(r.Context(), id, keys); err != nil {
 		log.Printf("shortener: delete: %v", err)
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)
 
@@ -372,30 +371,4 @@ func checkURL(u string) (*url.URL, error) {
 	}
 
 	return url, nil
-}
-
-// parseJSArray преобразует строку вида `[ "a", "b", "c", "d", ...]` в слайс строк
-// {"a", "b", "c", "d", ...}.
-func parseJSArray(s string) ([]string, error) {
-	var errWrongFormat = errors.New("wrong format")
-
-	if !strings.HasPrefix(s, "[") || !strings.HasSuffix(s, "]") {
-		return nil, errWrongFormat
-	}
-
-	s = strings.TrimPrefix(s, "[")
-	s = strings.TrimSuffix(s, "]")
-	s = strings.TrimSpace(s)
-
-	res := strings.Split(s, ",")
-	for i := range res {
-		res[i] = strings.TrimSpace(res[i])
-		if !strings.HasPrefix(res[i], "\"") || !strings.HasSuffix(res[i], "\"") {
-			return nil, errWrongFormat
-		}
-		res[i] = strings.TrimPrefix(res[i], "\"")
-		res[i] = strings.TrimSuffix(res[i], "\"")
-	}
-
-	return res, nil
 }

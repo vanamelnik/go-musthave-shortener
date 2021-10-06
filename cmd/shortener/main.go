@@ -209,7 +209,7 @@ func withFlags() configOption {
 		flag.IntVar(&flInt, "F", int(deleteFlushInterval/time.Millisecond), "Flush interval for accumulate data to delete in milliseconds")
 		flag.Parse()
 
-		cfg.deleteFlushInterval = time.Millisecond * time.Duration(flInt)
+		cfg.deleteFlushInterval = time.Duration(flInt) * time.Millisecond
 		setByUser := false
 		flag.Visit(func(f *flag.Flag) {
 			if f.Name == "p" {
