@@ -15,4 +15,4 @@ Response: ```[{"correlation_id": "<id>", "short_url": "<URL>"}, ...]```
 Response: ```[{"short_url": "<URL>", "original_url": "<URL>"}, ...]```
 ### DELETE /api/user/urls - delete URLs with the keys provided
 All URLs provided must be created in this session.
-Request: ```["<key>, ...]```
+Request: ```["<key>", ...]```
