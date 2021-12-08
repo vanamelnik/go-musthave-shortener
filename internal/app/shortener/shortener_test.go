@@ -17,11 +17,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	appContext "github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/context"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/dataloader"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
+	appContext "github.com/vanamelnik/go-musthave-shortener/internal/app/context"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/dataloader"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/shortener"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage/inmem"
 )
 
 // TestShortener - комплексный тест, прогоняющий все виды запросов к inmemory хранилищу.

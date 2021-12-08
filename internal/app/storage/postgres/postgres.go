@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx"
 	_ "github.com/jackc/pgx/stdlib"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage"
 )
 
 var _ storage.Storage = (*Repo)(nil)

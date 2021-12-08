@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/dataloader"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/dataloader"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage/inmem"
 )
 
 func TestDataLoader(t *testing.T) {

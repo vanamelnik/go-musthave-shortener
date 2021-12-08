@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/context"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/context"
 )
 
 // CookieMdlw проверяет в http request наличие cookie с полями uuid и token и добавляет в контекст запроса поле "uuid".

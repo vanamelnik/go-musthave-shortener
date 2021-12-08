@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage"
 )
 
 var _ storage.Storage = (*DB)(nil)

@@ -11,9 +11,9 @@ import (
 	"net/url"
 
 	"github.com/google/uuid"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/context"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/dataloader"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/context"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/dataloader"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage"
 
 	"github.com/gorilla/mux"
 )

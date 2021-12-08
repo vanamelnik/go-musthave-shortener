@@ -14,12 +14,12 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-multierror"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/dataloader"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/middleware"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/shortener"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/inmem"
-	"github.com/vanamelnik/go-musthave-shortener-tpl/internal/app/storage/postgres"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/dataloader"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/middleware"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/shortener"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage/inmem"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage/postgres"
 )
 
 // Значения по умолчанию
