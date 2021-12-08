@@ -1,23 +1,18 @@
-# go-musthave-shortener-tpl
-Шаблон репозитория для практического трек "Веб-разработка на Go"
+# go-musthave-shortener
+An URL shortener REST API service.
 
-# Начало работы
-
-1. Склонируйте репозиторий в любую подходящую директорию на вашем компьютере
-2. В корне репозитория выполните команду `go mod init <name>` (где `<name>` - адрес вашего репозитория на Github без префикса `https://`) для создания модуля
-
-# Обновление шаблона
-
-Чтобы иметь возможность получать обновления автотестов и других частей шаблона выполните следующую команды:
-
-```
-git remote add -m main template https://github.com/yandex-praktikum/go-musthave-shortener-tpl.git
-```
-
-Для обновления кода автотестов выполните команду:
-
-```
-git fetch template && git checkout template/main .github
-```
-
-затем добавьте полученые изменения в свой репозиторий.
+## Paths:
+### GET /{id} - redirect to an initial URL
+### POST / - shorten an URL provided in the body
+Responses a short URL in response body.
+### POST /api/shorten - shorten an URL provided in JSON object
+Request body: ```{"url": "<some_url>"}```
+Response: JSON object: ```{"result": "<shorten_url>"}```
+### POST /api/shorten/batch - batch URL shorten
+Request body: ```[{"correlation_id": "<id>", "original_url": "<URL>"}, ...]```
+Response: ```[{"correlation_id": "<id>", "short_url": "<URL>"}, ...]```
+### GET /user/urls - returns all URLs that have been processed in this session
+Response: ```[{"short_url": "<URL>", "original_url": "<URL>"}, ...]```
+### DELETE /api/user/urls - delete URLs with the keys provided
+All URLs provided must be created in this session.
+Request: ```["<key>, ...]```
