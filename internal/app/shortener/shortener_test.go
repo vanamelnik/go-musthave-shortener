@@ -3,6 +3,7 @@ package shortener_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -22,6 +23,11 @@ import (
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/shortener"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage/inmem"
+)
+
+const (
+	dsnDefault     = "host=localhost port=5432 user=postgres password=qwe123 dbname=postgres"
+	baseURLDefault = "http://localhost:8080"
 )
 
 // TestShortener - комплексный тест, прогоняющий все виды запросов к inmemory хранилищу.
@@ -280,3 +286,55 @@ func TestAPIShorten(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkShortenerInmem(b *testing.B) {
+	db, err := inmem.NewDB("tmp.db", time.Second)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		db.Close()
+		require.NoError(b, os.Remove("tmp.db"))
+	}()
+	s := shortener.NewShortener(baseURLDefault, db, dataloader.DataLoader{})
+	// jsonRecords := fakeRecords(b, 1000)
+	id := uuid.New()
+	keys := make([]string, 0, 10000)
+	b.Run("Shorten benchmark", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			url := fmt.Sprintf("http://%s.com", uuid.New().String())
+			r := httptest.NewRequest("POST", "/", strings.NewReader(url))
+			ctx := appContext.WithID(r.Context(), id)
+			r = r.WithContext(ctx)
+			w := httptest.NewRecorder()
+			h := http.HandlerFunc(s.ShortenURL)
+			h.ServeHTTP(w, r)
+			res := w.Result()
+			key, err := io.ReadAll(res.Body)
+			res.Body.Close()
+			if err != nil {
+				b.Fatalf("Could not read response body: %s", err)
+			}
+			if res.StatusCode != http.StatusCreated {
+				b.Fatalf("Could not shorten url %s: status: %s, response: %s", url, res.Status, key)
+			}
+			keys = append(keys, string(key))
+		}
+		b.Logf("%d urls processed", len(keys))
+	})
+}
+
+// func fakeRecords(b *testing.B, n int) string {
+// 	type req struct {
+// 		CorrelationID string `json:"correlation_id"`
+// 		OriginalURL   string `json:"original_url"`
+// 	}
+// 	records := make([]req, n)
+// 	for i := range records {
+// 		records[i].CorrelationID = fmt.Sprint(i)
+// 		records[i].OriginalURL = fmt.Sprintf("http://%d.com", i)
+// 	}
+// 	request, err := json.Marshal(records)
+// 	require.NoError(b, err)
+// 	return string(request)
+// }

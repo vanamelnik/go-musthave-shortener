@@ -23,13 +23,17 @@ type Repo struct {
 func NewRepo(ctx context.Context, dsn string) (*Repo, error) {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("NewRepo: could not connect to the DB: %w", err)
+	}
+	err = db.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("NewRepo: ping to DB failed: %w", err)
 	}
 
 	r := Repo{db: db}
 	err = r.createTable(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("NewRepo: CreateTable: %w", err)
 	}
 
 	return &r, nil
@@ -41,12 +45,15 @@ func (r Repo) createTable(ctx context.Context) error {
 	const queryIndex = `CREATE UNIQUE INDEX IF NOT EXISTS url_not_deleted ON repo(url) WHERE NOT deleted;`
 	_, err := r.db.ExecContext(ctx, queryCreate)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create table: %w", err)
 	}
 
 	_, err = r.db.ExecContext(ctx, queryIndex)
+	if err != nil {
+		return fmt.Errorf("could not create index: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 // destructiveReset удаляет таблицу из хранилища и пересоздаёт её заново.

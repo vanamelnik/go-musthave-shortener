@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-multierror"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/dataloader"
@@ -33,6 +35,8 @@ const (
 	fileNameDefault = "localhost.db"
 	baseURLDefault  = "http://localhost:8080"
 	srvAddrDefault  = ":8080"
+
+	pprofAddr = ":7070"
 
 	dsnDefault = "host=localhost port=5432 user=postgres password=qwe123 dbname=postgres"
 )
@@ -151,7 +155,10 @@ func main() {
 		log.Println(server.ListenAndServe())
 	}()
 	log.Println("Shortener server is listening at " + cfg.srvAddr)
-
+	go func() {
+		log.Println(http.ListenAndServe(pprofAddr, nil))
+	}()
+	log.Printf("pprof server listening at %s", pprofAddr)
 	<-sigint
 	log.Println("Shutting down... ")
 	if err := server.Shutdown(context.Background()); err != nil {
