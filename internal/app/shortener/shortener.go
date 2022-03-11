@@ -197,7 +197,7 @@ func (s Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
 
 // UserURLs возвращает в ответе json с массивом записей всех URL, созданных текущем пользователем
 //
-// GET /user/urls
+// GET /api/user/urls
 func (s Shortener) UserURLs(w http.ResponseWriter, r *http.Request) {
 	type urlRec struct {
 		ShortURL    string `json:"short_url"`

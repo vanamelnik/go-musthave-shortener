@@ -138,7 +138,7 @@ func main() {
 	router.HandleFunc("/", s.ShortenURL).Methods(http.MethodPost)
 	router.HandleFunc("/api/shorten", s.APIShortenURL).Methods(http.MethodPost)
 	router.HandleFunc("/api/shorten/batch", s.BatchShortenURL).Methods(http.MethodPost)
-	router.HandleFunc("/user/urls", s.UserURLs).Methods(http.MethodGet)
+	router.HandleFunc("/api/user/urls", s.UserURLs).Methods(http.MethodGet)
 	router.HandleFunc("/api/user/urls", s.DeleteURLs).Methods(http.MethodDelete)
 
 	router.Use(middleware.CookieMdlw(cfg.secret), middleware.GzipMdlw)
