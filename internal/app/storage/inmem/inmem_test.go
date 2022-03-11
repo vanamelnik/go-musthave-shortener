@@ -19,12 +19,6 @@ func TestGet(t *testing.T) {
 			{Key: "", OriginalURL: "url"},
 			{Key: "key", OriginalURL: ""},
 		},
-		/*map[string]string{
-			"key1": "url1",
-			"key2": "url2",
-			"":     "url",
-			"key":  "",
-		},*/
 	}
 	tt := []struct {
 		name    string
