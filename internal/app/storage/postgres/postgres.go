@@ -1,3 +1,4 @@
+// Пакет postgres - реализация хранилища ключей средствами БД PostgreSQL.
 package postgres
 
 import (

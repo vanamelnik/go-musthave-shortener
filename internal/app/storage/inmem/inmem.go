@@ -1,3 +1,5 @@
+// Пакет inmem представляет собой реализацию хранилища ключей в виде потокобезопасной in-memory структуры.
+// Данные хранилища переиодически сохраняются в файл сервисом gobber.
 package inmem
 
 import (
@@ -14,34 +16,36 @@ import (
 
 var _ storage.Storage = (*DB)(nil)
 
-type row struct {
-	SessionID   uuid.UUID
-	OriginalURL string
-	Key         string
-	Deleted     bool
-}
+type (
+	row struct {
+		SessionID   uuid.UUID
+		OriginalURL string
+		Key         string
+		Deleted     bool
+	}
 
-// DB - реализация интерфейса storage.Storage c thread-safe inmemory хранилищем (структура с RW Mutex).
-type DB struct {
-	sync.RWMutex
+	// DB - реализация интерфейса storage.Storage c thread-safe inmemory хранилищем (структура с RW Mutex).
+	DB struct {
+		sync.RWMutex
 
-	// repo - in-memory хранилище
-	repo []row
+		// repo - in-memory хранилище
+		repo []row
 
-	// fileName - имя файла, который хранит данные надиске в формате gob. При старте сервиса in-memory
-	// хранилище загружается из файла и по ходу работы периодически переписывает файл, если были изменения.
-	fileName string
+		// fileName - имя файла, который хранит данные надиске в формате gob. При старте сервиса in-memory
+		// хранилище загружается из файла и по ходу работы периодически переписывает файл, если были изменения.
+		fileName string
 
-	// flushInterval - интервал по истечении которого происходит обновление файла, если
-	// флаг isChanged установлен.
-	flushInterval time.Duration
+		// flushInterval - интервал по истечении которого происходит обновление файла, если
+		// флаг isChanged установлен.
+		flushInterval time.Duration
 
-	// isChanged флаг устанавливается при любых изменениях в хранилище и служит сигналом к тому, что
-	// файл с данными необходимо обновить.
-	isChanged bool
+		// isChanged флаг устанавливается при любых изменениях в хранилище и служит сигналом к тому, что
+		// файл с данными необходимо обновить.
+		isChanged bool
 
-	gobberStop chan struct{}
-}
+		gobberStop chan struct{}
+	}
+)
 
 // New инициализирует структуру in-memory хранилища.
 func NewDB(fileName string, interval time.Duration) (*DB, error) {
@@ -66,6 +70,7 @@ func NewDB(fileName string, interval time.Duration) (*DB, error) {
 	return db, nil
 }
 
+// Close закрывает сервис in-memory хранилища и останавливает воркер gobber.
 func (db *DB) Close() {
 	db.flush()
 
@@ -167,7 +172,7 @@ func (db *DB) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
 	return list
 }
 
-// BatchStore - реализация метода интерфейса storage.Storage
+// BatchStore - реализация метода интерфейса storage.Storage.
 func (db *DB) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Record) error {
 	db.Lock()
 	defer db.Unlock()
@@ -196,6 +201,7 @@ func (db *DB) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Re
 	return nil
 }
 
+// BatchDelete - реализация метода интерфейса storage.Storage.
 func (db *DB) BatchDelete(ctx context.Context, id uuid.UUID, keys []string) error {
 	db.Lock()
 	defer db.Unlock()

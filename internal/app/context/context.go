@@ -1,3 +1,4 @@
+// Пакет context добавляет к вызовам стандартной библиотеки методы WithID и ID
 package context
 
 import (

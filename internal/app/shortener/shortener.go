@@ -1,3 +1,4 @@
+// В пакете shortener представлены обработчики вызовов REST API
 package shortener
 
 import (
