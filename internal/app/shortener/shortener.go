@@ -1,4 +1,4 @@
-// В пакете shortener представлены обработчики вызовов REST API
+// В пакете shortener представлены обработчики вызовов REST API.
 package shortener
 
 import (
@@ -56,6 +56,7 @@ func (s Shortener) Ping(w http.ResponseWriter, r *http.Request) {
 // возвращает в ответе объект {"result": "<shorten_url>"}
 //
 // POST /api/shorten
+
 func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 	type Request struct {
 		URL string `json:"url"`
@@ -146,6 +147,7 @@ func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	// nolint:errcheck
 	w.Write([]byte(shortURL))
 }
+
 func (s Shortener) shortenURL(w http.ResponseWriter, r *http.Request, id uuid.UUID, u string) (shortURL string, retErr error) {
 	url, err := checkURL(u)
 	if err != nil {
@@ -310,7 +312,8 @@ func (s Shortener) BatchShortenURL(w http.ResponseWriter, r *http.Request) {
 	log.Printf("shortener: Batch: successfully added %d records to the repository", len(records))
 }
 
-// DeleteURLs
+// DeleteURLs удаляет все записи о ключах, созданных в рамках текущей сессии.
+// Ключи передаются в формате ["<key1>", "<key2>"...]
 //
 // DELETE /api/user/urls
 func (s Shortener) DeleteURLs(w http.ResponseWriter, r *http.Request) {
