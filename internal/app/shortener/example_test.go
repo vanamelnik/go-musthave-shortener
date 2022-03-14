@@ -83,6 +83,7 @@ func ExampleShortener_DeleteURLs() {
 	if err != nil {
 		// handle error
 	}
+	defer resp.Body.Close()
 
 	fmt.Printf("Status: %s\n", resp.Status)
 }

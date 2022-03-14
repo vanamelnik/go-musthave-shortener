@@ -28,3 +28,7 @@ tmp/
 # File storage
 *.gob
 *.db
+
+# Scripts for start and stop postgres container
+start_postgres
+stop_postgres

@@ -163,7 +163,7 @@ func (s Shortener) shortenURL(w http.ResponseWriter, r *http.Request, id uuid.UU
 			if err != nil {
 				return "", err
 			}
-			log.Printf("[INF] shortener: ShortenURL: created a token %v for %v", key, url)
+			// log.Printf("[INF] shortener: ShortenURL: created a token %v for %v", key, url)
 			shortURL = fmt.Sprintf("%s/%s", s.BaseURL, key)
 
 			return shortURL, nil
@@ -194,7 +194,7 @@ func (s Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "URL not found", http.StatusNotFound)
 		return
 	}
-	log.Printf("shortener: DecodeURL: redirecting to %v (key: %v)", url, key)
+	// log.Printf("shortener: DecodeURL: redirecting to %v (key: %v)", url, key)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
