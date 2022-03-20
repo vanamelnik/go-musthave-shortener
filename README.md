@@ -11,7 +11,7 @@ Response: JSON object: ```{"result": "<shorten_url>"}```
 ### POST /api/shorten/batch - batch URL shorten
 Request body: ```[{"correlation_id": "<id>", "original_url": "<URL>"}, ...]```
 Response: ```[{"correlation_id": "<id>", "short_url": "<URL>"}, ...]```
-### GET /user/urls - returns all URLs that have been processed in this session
+### GET /api/user/urls - returns all URLs that have been processed in this session
 Response: ```[{"short_url": "<URL>", "original_url": "<URL>"}, ...]```
 ### DELETE /api/user/urls - delete URLs with the keys provided
 All URLs provided must be created in this session.

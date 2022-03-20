@@ -1,3 +1,4 @@
+// В пакете shortener представлены обработчики вызовов REST API.
 package shortener
 
 import (
@@ -55,6 +56,7 @@ func (s Shortener) Ping(w http.ResponseWriter, r *http.Request) {
 // возвращает в ответе объект {"result": "<shorten_url>"}
 //
 // POST /api/shorten
+
 func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 	type Request struct {
 		URL string `json:"url"`
@@ -145,6 +147,7 @@ func (s Shortener) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	// nolint:errcheck
 	w.Write([]byte(shortURL))
 }
+
 func (s Shortener) shortenURL(w http.ResponseWriter, r *http.Request, id uuid.UUID, u string) (shortURL string, retErr error) {
 	url, err := checkURL(u)
 	if err != nil {
@@ -160,7 +163,7 @@ func (s Shortener) shortenURL(w http.ResponseWriter, r *http.Request, id uuid.UU
 			if err != nil {
 				return "", err
 			}
-			log.Printf("[INF] shortener: ShortenURL: created a token %v for %v", key, url)
+			// log.Printf("[INF] shortener: ShortenURL: created a token %v for %v", key, url)
 			shortURL = fmt.Sprintf("%s/%s", s.BaseURL, key)
 
 			return shortURL, nil
@@ -191,13 +194,13 @@ func (s Shortener) DecodeURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "URL not found", http.StatusNotFound)
 		return
 	}
-	log.Printf("shortener: DecodeURL: redirecting to %v (key: %v)", url, key)
+	// log.Printf("shortener: DecodeURL: redirecting to %v (key: %v)", url, key)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 // UserURLs возвращает в ответе json с массивом записей всех URL, созданных текущем пользователем
 //
-// GET /user/urls
+// GET /api/user/urls
 func (s Shortener) UserURLs(w http.ResponseWriter, r *http.Request) {
 	type urlRec struct {
 		ShortURL    string `json:"short_url"`
@@ -309,7 +312,8 @@ func (s Shortener) BatchShortenURL(w http.ResponseWriter, r *http.Request) {
 	log.Printf("shortener: Batch: successfully added %d records to the repository", len(records))
 }
 
-// DeleteURLs
+// DeleteURLs удаляет все записи о ключах, созданных в рамках текущей сессии.
+// Ключи передаются в формате ["<key1>", "<key2>"...]
 //
 // DELETE /api/user/urls
 func (s Shortener) DeleteURLs(w http.ResponseWriter, r *http.Request) {

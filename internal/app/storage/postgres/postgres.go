@@ -1,3 +1,4 @@
+// Пакет postgres - реализация хранилища ключей средствами БД PostgreSQL.
 package postgres
 
 import (
@@ -20,16 +21,21 @@ type Repo struct {
 	db *sql.DB
 }
 
+// NewRepo создаёт новый сервис Postgreds storage.
 func NewRepo(ctx context.Context, dsn string) (*Repo, error) {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("NewRepo: could not connect to the DB: %w", err)
+	}
+	err = db.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("NewRepo: ping to DB failed: %w", err)
 	}
 
 	r := Repo{db: db}
 	err = r.createTable(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("NewRepo: CreateTable: %w", err)
 	}
 
 	return &r, nil
@@ -41,12 +47,15 @@ func (r Repo) createTable(ctx context.Context) error {
 	const queryIndex = `CREATE UNIQUE INDEX IF NOT EXISTS url_not_deleted ON repo(url) WHERE NOT deleted;`
 	_, err := r.db.ExecContext(ctx, queryCreate)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create table: %w", err)
 	}
 
 	_, err = r.db.ExecContext(ctx, queryIndex)
+	if err != nil {
+		return fmt.Errorf("could not create index: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 // destructiveReset удаляет таблицу из хранилища и пересоздаёт её заново.
@@ -84,6 +93,7 @@ func (r Repo) Store(ctx context.Context, id uuid.UUID, key, url string) error {
 	return nil
 }
 
+// GetAll имплементирует интерфейс storage.Storage.
 func (r Repo) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
 	m := make(map[string]string)
 	rows, err := r.db.QueryContext(ctx,
@@ -112,6 +122,7 @@ func (r Repo) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
 
 }
 
+// Get имплементирует интерфейс storage.Storage.
 func (r Repo) Get(ctx context.Context, key string) (string, error) {
 	row := r.db.QueryRowContext(ctx,
 		`SELECT url, deleted FROM repo WHERE key=$1;`, key)
@@ -125,16 +136,18 @@ func (r Repo) Get(ctx context.Context, key string) (string, error) {
 	return url, err
 }
 
+// Close имплементирует интерфейс storage.Storage.
 func (r Repo) Close() {
 	r.db.Close()
 	log.Println("postgres: database closed")
 }
 
+// Ping имплементирует интерфейс storage.Storage.
 func (r Repo) Ping() error {
 	return r.db.Ping()
 }
 
-// BatchStore - реализация метода интерфейса storage.Storage
+// BatchStore имплементирует интерфейс storage.Storage.
 func (r Repo) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Record) error {
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -162,6 +175,7 @@ func (r Repo) BatchStore(ctx context.Context, id uuid.UUID, records []storage.Re
 	return tx.Commit()
 }
 
+// BatchDelete имплементирует интерфейс storage.Storage.
 func (r Repo) BatchDelete(ctx context.Context, id uuid.UUID, keys []string) error {
 	tx, err := r.db.Begin()
 	if err != nil {
