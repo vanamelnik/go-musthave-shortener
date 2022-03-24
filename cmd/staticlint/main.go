@@ -45,6 +45,7 @@ import (
 )
 
 func main() {
+	// подключаем анализаторы из пакета golang.org/x/tools/go/analysis/passes:
 	analysers := []*analysis.Analyzer{
 		asmdecl.Analyzer,
 		assign.Analyzer,
@@ -86,7 +87,11 @@ func main() {
 		unusedwrite.Analyzer,
 		usesgenerics.Analyzer,
 	}
-	analysers = append(analysers, OsExitAnalyzer)
+
+	// подключаем анализатор вызова os.Exit в функции main() пакета main:
+	analysers = append(analysers, osExitAnalyzer)
+
+	// подключаем анализаторы из пакета staticcheck
 	analysers = append(analysers, newStaticChecks()...)
 	multichecker.Main(analysers...)
 }

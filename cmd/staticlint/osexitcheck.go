@@ -7,14 +7,16 @@ import (
 )
 
 var (
-	OsExitAnalyzer = &analysis.Analyzer{
+	// osExitAnalyzer проверяет вызов функции os.Exit() из функции main() пакета main.
+	osExitAnalyzer = &analysis.Analyzer{
 		Name: "osexit",
-		Doc:  "check for os.Exit call in main function",
+		Doc:  "check for os.Exit call in main function within package main",
 		Run:  osExitRun,
 	}
 )
 
 func osExitRun(pass *analysis.Pass) (interface{}, error) {
+	// funcCallsList возвращает список всех функций, вызываемых из переданной функции.
 	funcCallsList := func(x *ast.FuncDecl) []*ast.CallExpr {
 		list := make([]*ast.CallExpr, 0, len(x.Body.List))
 		for _, stmt := range x.Body.List {
@@ -24,9 +26,11 @@ func osExitRun(pass *analysis.Pass) (interface{}, error) {
 				}
 			}
 		}
+
 		return list
 	}
 
+	// checkOsExitCall проверяет, является ли переданный вызов функции вызовом os.Exit().
 	checkOsExitCall := func(callExpr *ast.CallExpr) bool {
 		switch x := callExpr.Fun.(type) {
 		case *ast.SelectorExpr:
@@ -41,6 +45,7 @@ func osExitRun(pass *analysis.Pass) (interface{}, error) {
 		return false
 	}
 
+	// проверка работает только для пакета main
 	if pass.Pkg.Name() != "main" {
 		return nil, nil
 	}
@@ -54,11 +59,11 @@ func osExitRun(pass *analysis.Pass) (interface{}, error) {
 				if checkOsExitCall(callExpr) {
 					pass.Reportf(callExpr.Pos(), "call of os.Exit within 'main()' func of package 'main'")
 				}
-
 			}
 
 			return true
 		})
 	}
+
 	return nil, nil
 }
