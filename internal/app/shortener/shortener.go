@@ -75,7 +75,8 @@ func (s Shortener) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 	urlReq := Request{}
 	dec := json.NewDecoder(r.Body)
 	defer r.Body.Close()
-	if err := dec.Decode(&urlReq); err != nil {
+	err = dec.Decode(&urlReq)
+	if err != nil {
 		log.Printf("APIShortenURL: %v", err)
 		http.Error(w, "Bad request", http.StatusBadRequest)
 

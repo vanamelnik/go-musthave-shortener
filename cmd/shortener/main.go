@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
@@ -22,6 +23,13 @@ import (
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage/inmem"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage/postgres"
+)
+
+// Информация о версии
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
 )
 
 // Значения по умолчанию
@@ -99,6 +107,7 @@ func (cfg config) validate() (retErr error) {
 }
 
 func main() {
+	displayVersionInfo()
 	cfg := newConfig(
 		withFlags(),
 		withEnv(),
@@ -245,4 +254,20 @@ func withEnv() configOption {
 			}
 		}
 	}
+}
+
+func displayVersionInfo() {
+	if buildVersion == "" {
+		buildVersion = "N/A"
+	}
+	if buildDate == "" {
+		buildDate = "N/A"
+	}
+	if buildCommit == "" {
+		buildCommit = "N/A"
+	}
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
+	fmt.Println()
 }
