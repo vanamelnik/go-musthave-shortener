@@ -23,6 +23,7 @@ import (
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage/inmem"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage/postgres"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // Информация о версии
@@ -47,6 +48,8 @@ const (
 	pprofAddr = ":7070"
 
 	dsnDefault = "host=localhost port=5432 user=postgres password=qwe123 dbname=postgres"
+
+	defaultHost = "go-musthave-shortener.io"
 )
 
 // Провайдеры хранилища
@@ -69,6 +72,8 @@ type config struct {
 	deleteFlushInterval time.Duration
 
 	dsn string
+
+	enableHTTPS bool
 }
 
 func (cfg config) String() string {
@@ -86,6 +91,11 @@ func (cfg config) String() string {
 	}
 	if cfg.dsn != "" {
 		b.WriteString(" dsn='" + cfg.dsn + "'")
+	}
+	if cfg.enableHTTPS {
+		b.WriteString(" enableHTTPS: yes")
+	} else {
+		b.WriteString(" enableHTTPS: no")
 	}
 
 	return b.String()
@@ -138,7 +148,6 @@ func main() {
 	defer dl.Close()
 
 	s := shortener.NewShortener(cfg.baseURL, db, dl)
-
 	router := mux.NewRouter()
 
 	router.HandleFunc("/ping", s.Ping).Methods(http.MethodGet)
@@ -161,7 +170,17 @@ func main() {
 	signal.Notify(sigint, os.Interrupt)
 
 	go func() {
-		log.Println(server.ListenAndServe())
+		if !cfg.enableHTTPS {
+			log.Println(server.ListenAndServe())
+			return
+		}
+		manager := &autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			Cache:      autocert.DirCache("cache-dir"),
+			HostPolicy: autocert.HostWhitelist(defaultHost, "www."+defaultHost),
+		}
+		server.TLSConfig = manager.TLSConfig()
+		log.Println(server.ListenAndServeTLS("", ""))
 	}()
 	log.Println("Shortener server is listening at " + cfg.srvAddr)
 	go func() {
@@ -187,6 +206,7 @@ func newConfig(opts ...configOption) config {
 		inmemFlushInterval:  inmemFlushInterval,
 		deleteFlushInterval: deleteFlushInterval,
 		dsn:                 "", // значения по умолчанию будут внесены функцией newConfig.
+		enableHTTPS:         false,
 	}
 
 	for _, fn := range opts {
@@ -218,11 +238,12 @@ func withFlags() configOption {
 		flag.StringVar(&cfg.srvAddr, "a", srvAddrDefault, "Server address")
 		flag.StringVar(&cfg.baseURL, "b", baseURLDefault, "Base URL")
 		flag.StringVar(&cfg.secret, "p", "*****", "Secret key for hashing cookies") // чтобы ключ по умолчанию не отображался в usage, придется действовать из-за угла))
-		flag.StringVar(&cfg.dbType, "s", dbInmem, "Storage type (default inmem)\n- inmem\t\tin-memory storage periodically written to .gob file\n"+
+		flag.StringVar(&cfg.dbType, "t", dbInmem, "Storage type (default inmem)\n- inmem\t\tin-memory storage periodically written to .gob file\n"+
 			"- postgres\tPostgreSQL database")
 		flag.StringVar(&cfg.fileName, "f", fileNameDefault, "File storage path")
 		flag.StringVar(&cfg.dsn, "d", "", "Database DSN")
 		flag.IntVar(&flInt, "F", int(deleteFlushInterval/time.Millisecond), "Flush interval for accumulate data to delete in milliseconds")
+		flag.BoolVar(&cfg.enableHTTPS, "s", false, "enable HTTPS")
 		flag.Parse()
 
 		cfg.deleteFlushInterval = time.Duration(flInt) * time.Millisecond
@@ -252,6 +273,9 @@ func withEnv() configOption {
 			if envVal, ok := os.LookupEnv(v); ok {
 				*env[v] = envVal
 			}
+		}
+		if _, ok := os.LookupEnv("ENABLE_HTTPS"); ok {
+			cfg.enableHTTPS = true
 		}
 	}
 }
