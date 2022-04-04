@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -41,16 +42,74 @@ const (
 
 	defaultSecret = "секретный ключ, которым шифруются подписи"
 
-	fileNameDefault = "localhost.db"
-	baseURLDefault  = "http://localhost:8080"
-	srvAddrDefault  = ":8080"
+	fileStorageDefault = "localhost.db"
+	baseURLDefault     = "http://localhost:8080"
+	srvAddrDefault     = ":8080"
 
 	pprofAddr = ":7070"
 
 	dsnDefault = "host=localhost port=5432 user=postgres password=qwe123 dbname=postgres"
 
 	defaultHost = "go-musthave-shortener.io"
+
+	defaultCfgFileName = "config.json"
 )
+
+type setFlags struct {
+	configFileName      *string
+	baseURL             *string
+	srvAddr             *string
+	secret              *string
+	dbType              *string
+	storageFileName     *string
+	dsn                 *string
+	enableHTTPS         *bool
+	deleteFlushInterval *time.Duration
+}
+
+// getFlags считывает установленные пользователем флаги и возвращает структуру setFlags.
+func getFlags() setFlags {
+	var flushInterval int
+	configFilename := flag.String("c", defaultCfgFileName, "configuration file")
+	srvAddr := flag.String("a", srvAddrDefault, "Server address")
+	baseURL := flag.String("b", baseURLDefault, "Base URL")
+	secret := flag.String("p", "*****", "Secret key for hashing cookies") // чтобы ключ по умолчанию не отображался в usage, придется действовать из-за угла))
+	dbType := flag.String("t", dbInmem, "Storage type (default inmem)\n- inmem\t\tin-memory storage periodically written to .gob file\n"+
+		"- postgres\tPostgreSQL database")
+	storageFileName := flag.String("f", fileStorageDefault, "File storage path")
+	dsn := flag.String("d", "", "Database DSN")
+	enableHTTPS := flag.Bool("s", false, "enable HTTPS")
+	flag.IntVar(&flushInterval, "F", int(deleteFlushInterval/time.Millisecond), "Flush interval for accumulate data to delete in milliseconds")
+	flag.Parse()
+
+	delFlushInterval := time.Duration(flushInterval) * time.Millisecond
+
+	sf := setFlags{}
+	flag.Visit(func(f *flag.Flag) { // установить только те поля структуры setFlags, которые были заданы явно
+		switch f.Name {
+		case "c":
+			sf.configFileName = configFilename
+		case "a":
+			sf.srvAddr = srvAddr
+		case "b":
+			sf.baseURL = baseURL
+		case "p":
+			sf.secret = secret
+		case "t":
+			sf.dbType = dbType
+		case "f":
+			sf.storageFileName = storageFileName
+		case "d":
+			sf.dsn = dsn
+		case "s":
+			sf.enableHTTPS = enableHTTPS
+		case "F":
+			sf.deleteFlushInterval = &delFlushInterval
+		}
+	})
+
+	return sf
+}
 
 // Провайдеры хранилища
 const (
@@ -58,68 +117,21 @@ const (
 	dbPostgres = "postgres"
 )
 
-// config определяет базовую конйигурацию сервиса.
-type config struct {
-	baseURL string
-	srvAddr string
-	secret  string
-
-	dbType string
-
-	fileName           string
-	inmemFlushInterval time.Duration
-
-	deleteFlushInterval time.Duration
-
-	dsn string
-
-	enableHTTPS bool
-}
-
-func (cfg config) String() string {
-	var b strings.Builder
-	b.WriteString("baseURL='" + cfg.baseURL + "'")
-	b.WriteString(" srvAddr='" + cfg.srvAddr + "'")
-	b.WriteString(" secret='*****'")
-	b.WriteString(" dbType='" + cfg.dbType + "'")
-	b.WriteString(" deleteFlushInterval=" + cfg.deleteFlushInterval.String())
-	if cfg.fileName != "" {
-		b.WriteString(" fileName='" + cfg.fileName + "'")
-	}
-	if cfg.inmemFlushInterval != 0 {
-		b.WriteString(" inmemFlushInterval=" + cfg.inmemFlushInterval.String())
-	}
-	if cfg.dsn != "" {
-		b.WriteString(" dsn='" + cfg.dsn + "'")
-	}
-	if cfg.enableHTTPS {
-		b.WriteString(" enableHTTPS: yes")
-	} else {
-		b.WriteString(" enableHTTPS: no")
-	}
-
-	return b.String()
-}
-
-// validate проверяет конфигурацию и выдает ошибку, если обнаруживает пустые поля.
-func (cfg config) validate() (retErr error) {
-	if cfg.baseURL == "" {
-		retErr = multierror.Append(retErr, errors.New("missing base URL"))
-	}
-	if cfg.srvAddr == "" {
-		retErr = multierror.Append(retErr, errors.New("mising server address"))
-	}
-	if cfg.dbType != dbInmem && cfg.dbType != dbPostgres {
-		retErr = multierror.Append(retErr, errors.New("invalid storage type"))
-	}
-
-	return
-}
-
 func main() {
 	displayVersionInfo()
+
+	sf := getFlags()
+	configFileName, ok := os.LookupEnv("CONFIG")
+	if !ok { // если переменная окружения CONFIG не установлена
+		if sf.configFileName != nil { // смотрим, не задано ли имя файла конфигурации флагом
+			configFileName = *sf.configFileName
+		} else {
+			configFileName = defaultCfgFileName // если нет, то используем значение по умолчанию
+		}
+	}
 	cfg := newConfig(
-		withFlags(),
+		withFile(configFileName),
+		withFlags(sf),
 		withEnv(),
 	)
 	err := cfg.validate()
@@ -131,23 +143,23 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	var db storage.Storage
-	switch cfg.dbType {
+	switch cfg.DbType {
 	case dbInmem:
 		log.Println("Connecting to in-memory storage...")
-		db, err = inmem.NewDB(cfg.fileName, cfg.inmemFlushInterval)
+		db, err = inmem.NewDB(cfg.StorageFileName, cfg.InmemFlushInterval)
 	case dbPostgres:
 		log.Print("Connecting to Postgres engine...")
-		db, err = postgres.NewRepo(context.Background(), cfg.dsn)
+		db, err = postgres.NewRepo(context.Background(), cfg.DSN)
 	}
 	if err != nil {
 		log.Fatalf("Connect to db failed: %v", err)
 	}
 	defer db.Close()
 
-	dl := dataloader.NewDataLoader(context.Background(), db.BatchDelete, cfg.deleteFlushInterval)
+	dl := dataloader.NewDataLoader(context.Background(), db.BatchDelete, cfg.DeleteFlushInterval)
 	defer dl.Close()
 
-	s := shortener.NewShortener(cfg.baseURL, db, dl)
+	s := shortener.NewShortener(cfg.BaseURL, db, dl)
 	router := mux.NewRouter()
 
 	router.HandleFunc("/ping", s.Ping).Methods(http.MethodGet)
@@ -159,10 +171,10 @@ func main() {
 	router.HandleFunc("/api/user/urls", s.UserURLs).Methods(http.MethodGet)
 	router.HandleFunc("/api/user/urls", s.DeleteURLs).Methods(http.MethodDelete)
 
-	router.Use(middleware.CookieMdlw(cfg.secret), middleware.GzipMdlw)
+	router.Use(middleware.CookieMdlw(cfg.Secret), middleware.GzipMdlw)
 
 	server := http.Server{
-		Addr:    cfg.srvAddr,
+		Addr:    cfg.SrvAddr,
 		Handler: router,
 	}
 
@@ -170,7 +182,7 @@ func main() {
 	signal.Notify(sigint, os.Interrupt)
 
 	go func() {
-		if !cfg.enableHTTPS {
+		if !cfg.EnableHTTPS {
 			log.Println(server.ListenAndServe())
 			return
 		}
@@ -182,7 +194,7 @@ func main() {
 		server.TLSConfig = manager.TLSConfig()
 		log.Println(server.ListenAndServeTLS("", ""))
 	}()
-	log.Println("Shortener server is listening at " + cfg.srvAddr)
+	log.Println("Shortener server is listening at " + cfg.SrvAddr)
 	go func() {
 		log.Println(http.ListenAndServe(pprofAddr, nil))
 	}()
@@ -194,19 +206,72 @@ func main() {
 	}
 }
 
-type configOption func(*config)
+// Config определяет базовую конйигурацию сервиса.
+type Config struct {
+	BaseURL             string `json:"base_url"`
+	SrvAddr             string `json:"server_address"`
+	Secret              string
+	DbType              string
+	StorageFileName     string `json:"file_storage_path"`
+	DSN                 string `json:"database_dsn"`
+	EnableHTTPS         bool   `json:"enable_https"`
+	InmemFlushInterval  time.Duration
+	DeleteFlushInterval time.Duration
+}
+
+func (cfg Config) String() string {
+	var b strings.Builder
+	b.WriteString("baseURL='" + cfg.BaseURL + "'")
+	b.WriteString(" srvAddr='" + cfg.SrvAddr + "'")
+	b.WriteString(" secret='*****'")
+	b.WriteString(" dbType='" + cfg.DbType + "'")
+	b.WriteString(" deleteFlushInterval=" + cfg.DeleteFlushInterval.String())
+	if cfg.StorageFileName != "" {
+		b.WriteString(" fileName='" + cfg.StorageFileName + "'")
+	}
+	if cfg.InmemFlushInterval != 0 {
+		b.WriteString(" inmemFlushInterval=" + cfg.InmemFlushInterval.String())
+	}
+	if cfg.DSN != "" {
+		b.WriteString(" dsn='" + cfg.DSN + "'")
+	}
+	if cfg.EnableHTTPS {
+		b.WriteString(" enableHTTPS: yes")
+	} else {
+		b.WriteString(" enableHTTPS: no")
+	}
+
+	return b.String()
+}
+
+// validate проверяет конфигурацию и выдает ошибку, если обнаруживает пустые поля.
+func (cfg Config) validate() (retErr error) {
+	if cfg.BaseURL == "" {
+		retErr = multierror.Append(retErr, errors.New("missing base URL"))
+	}
+	if cfg.SrvAddr == "" {
+		retErr = multierror.Append(retErr, errors.New("mising server address"))
+	}
+	if cfg.DbType != dbInmem && cfg.DbType != dbPostgres {
+		retErr = multierror.Append(retErr, errors.New("invalid storage type"))
+	}
+
+	return
+}
+
+type configOption func(*Config)
 
 // newConfig формирует конфигурацию из значений по умолчанию, затем опционально меняет
 // поля при помощи функций configOption.
-func newConfig(opts ...configOption) config {
-	cfg := config{
-		baseURL:             baseURLDefault,
-		srvAddr:             srvAddrDefault,
-		fileName:            fileNameDefault,
-		inmemFlushInterval:  inmemFlushInterval,
-		deleteFlushInterval: deleteFlushInterval,
-		dsn:                 "", // значения по умолчанию будут внесены функцией newConfig.
-		enableHTTPS:         false,
+func newConfig(opts ...configOption) Config {
+	cfg := Config{
+		BaseURL:             baseURLDefault,
+		SrvAddr:             srvAddrDefault,
+		StorageFileName:     fileStorageDefault,
+		InmemFlushInterval:  inmemFlushInterval,
+		DeleteFlushInterval: deleteFlushInterval,
+		DSN:                 "", // значения по умолчанию будут внесены функцией newConfig.
+		EnableHTTPS:         false,
 	}
 
 	for _, fn := range opts {
@@ -214,59 +279,80 @@ func newConfig(opts ...configOption) config {
 	}
 
 	// Если пользователь передал DSN для Postgres, используем Postgres, игнорируя флаги.
-	if cfg.dsn != "" {
-		cfg.dbType = dbPostgres
+	if cfg.DSN != "" {
+		cfg.DbType = dbPostgres
 	}
 
-	switch cfg.dbType {
+	switch cfg.DbType {
 	case dbPostgres:
-		if cfg.dsn == "" {
-			cfg.dsn = dsnDefault
+		if cfg.DSN == "" {
+			cfg.DSN = dsnDefault
 		}
-		cfg.fileName = ""
-		cfg.inmemFlushInterval = 0
+		cfg.StorageFileName = ""
+		cfg.InmemFlushInterval = 0
+	case "":
+		cfg.DbType = dbInmem
+		cfg.DSN = ""
 	case dbInmem:
-		cfg.dsn = ""
+		cfg.DSN = ""
 	}
 
 	return cfg
 }
 
-func withFlags() configOption {
-	return func(cfg *config) {
-		var flInt int
-		flag.StringVar(&cfg.srvAddr, "a", srvAddrDefault, "Server address")
-		flag.StringVar(&cfg.baseURL, "b", baseURLDefault, "Base URL")
-		flag.StringVar(&cfg.secret, "p", "*****", "Secret key for hashing cookies") // чтобы ключ по умолчанию не отображался в usage, придется действовать из-за угла))
-		flag.StringVar(&cfg.dbType, "t", dbInmem, "Storage type (default inmem)\n- inmem\t\tin-memory storage periodically written to .gob file\n"+
-			"- postgres\tPostgreSQL database")
-		flag.StringVar(&cfg.fileName, "f", fileNameDefault, "File storage path")
-		flag.StringVar(&cfg.dsn, "d", "", "Database DSN")
-		flag.IntVar(&flInt, "F", int(deleteFlushInterval/time.Millisecond), "Flush interval for accumulate data to delete in milliseconds")
-		flag.BoolVar(&cfg.enableHTTPS, "s", false, "enable HTTPS")
-		flag.Parse()
+func withFile(filename string) configOption {
+	return func(cfg *Config) {
+		log.Printf("open file %s", filename)
+		f, err := os.Open(filename)
+		if err != nil {
+			log.Fatalf("config: could not read file %s: %s", filename, err)
+		}
+		defer f.Close()
+		if err := json.NewDecoder(f).Decode(&cfg); err != nil {
+			log.Fatalf("config: could not decode file %s: %s", filename, err)
+		}
+		log.Printf("config from the file: %s", cfg)
+	}
+}
 
-		cfg.deleteFlushInterval = time.Duration(flInt) * time.Millisecond
-		setByUser := false
-		flag.Visit(func(f *flag.Flag) {
-			if f.Name == "p" {
-				setByUser = true
-			}
-		})
-		if !setByUser {
-			cfg.secret = defaultSecret
+// withFlags устанавливает значения конфигурации в соответствии с переданными флагами.
+func withFlags(sf setFlags) configOption {
+	return func(cfg *Config) {
+		if sf.baseURL != nil {
+			cfg.BaseURL = *sf.baseURL
+		}
+		if sf.srvAddr != nil {
+			cfg.SrvAddr = *sf.srvAddr
+		}
+		if sf.secret != nil {
+			cfg.Secret = *sf.secret
+		}
+		if sf.dbType != nil {
+			cfg.DbType = *sf.dbType
+		}
+		if sf.storageFileName != nil {
+			cfg.StorageFileName = *sf.storageFileName
+		}
+		if sf.dsn != nil {
+			cfg.DSN = *sf.dsn
+		}
+		if sf.enableHTTPS != nil {
+			cfg.EnableHTTPS = *sf.enableHTTPS
+		}
+		if sf.deleteFlushInterval != nil {
+			cfg.DeleteFlushInterval = *sf.deleteFlushInterval
 		}
 	}
 }
 
 func withEnv() configOption {
-	return func(cfg *config) {
+	return func(cfg *Config) {
 		env := map[string]*string{
-			"BASE_URL":          &cfg.baseURL,
-			"SERVER_ADDRESS":    &cfg.srvAddr,
-			"FILE_STORAGE_PATH": &cfg.fileName,
-			"DATABASE_DSN":      &cfg.dsn,
-			"HASH_KEY":          &cfg.secret,
+			"BASE_URL":          &cfg.BaseURL,
+			"SERVER_ADDRESS":    &cfg.SrvAddr,
+			"FILE_STORAGE_PATH": &cfg.StorageFileName,
+			"DATABASE_DSN":      &cfg.DSN,
+			"HASH_KEY":          &cfg.Secret,
 		}
 
 		for v := range env {
@@ -275,7 +361,7 @@ func withEnv() configOption {
 			}
 		}
 		if _, ok := os.LookupEnv("ENABLE_HTTPS"); ok {
-			cfg.enableHTTPS = true
+			cfg.EnableHTTPS = true
 		}
 	}
 }
