@@ -1,1 +1,7 @@
-{}
+{
+    "server_address": "localhost:8080",
+    "base_url": "http://localhost",
+    "db_type": "inmem",
+    "file_storage_path": "localhost.db",
+    "enable_https": false
+}

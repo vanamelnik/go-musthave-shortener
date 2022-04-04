@@ -36,9 +36,9 @@ var (
 
 // Значения по умолчанию
 const (
-	inmemFlushInterval = 10 * time.Second
+	defaultInmemFlushInterval = 10 * time.Second
 
-	deleteFlushInterval = time.Millisecond
+	defaultDeleteFlushInterval = time.Millisecond
 
 	defaultSecret = "секретный ключ, которым шифруются подписи"
 
@@ -79,7 +79,7 @@ func getFlags() setFlags {
 	storageFileName := flag.String("f", fileStorageDefault, "File storage path")
 	dsn := flag.String("d", "", "Database DSN")
 	enableHTTPS := flag.Bool("s", false, "enable HTTPS")
-	flag.IntVar(&flushInterval, "F", int(deleteFlushInterval/time.Millisecond), "Flush interval for accumulate data to delete in milliseconds")
+	flag.IntVar(&flushInterval, "F", int(defaultDeleteFlushInterval/time.Millisecond), "Flush interval for accumulate data to delete in milliseconds")
 	flag.Parse()
 
 	delFlushInterval := time.Duration(flushInterval) * time.Millisecond
@@ -129,10 +129,10 @@ func main() {
 			configFileName = defaultCfgFileName // если нет, то используем значение по умолчанию
 		}
 	}
-	cfg := newConfig(
+	cfg := newConfig( // порядок имеет значение
 		withFile(configFileName),
 		withFlags(sf),
-		withEnv(),
+		withEnv(), // наивысший приоритет у переменных окружения
 	)
 	err := cfg.validate()
 	if err != nil {
@@ -143,7 +143,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	var db storage.Storage
-	switch cfg.DbType {
+	switch cfg.DBType {
 	case dbInmem:
 		log.Println("Connecting to in-memory storage...")
 		db, err = inmem.NewDB(cfg.StorageFileName, cfg.InmemFlushInterval)
@@ -208,15 +208,15 @@ func main() {
 
 // Config определяет базовую конйигурацию сервиса.
 type Config struct {
-	BaseURL             string `json:"base_url"`
-	SrvAddr             string `json:"server_address"`
-	Secret              string
-	DbType              string
-	StorageFileName     string `json:"file_storage_path"`
-	DSN                 string `json:"database_dsn"`
-	EnableHTTPS         bool   `json:"enable_https"`
-	InmemFlushInterval  time.Duration
-	DeleteFlushInterval time.Duration
+	BaseURL             string        `json:"base_url"`
+	SrvAddr             string        `json:"server_address"`
+	Secret              string        `json:"secret"`
+	DBType              string        `json:"db_type"`
+	StorageFileName     string        `json:"file_storage_path"`
+	DSN                 string        `json:"database_dsn"`
+	EnableHTTPS         bool          `json:"enable_https"`
+	InmemFlushInterval  time.Duration `json:"inmem_flush_interval"`
+	DeleteFlushInterval time.Duration `json:"delete_flush_interval"`
 }
 
 func (cfg Config) String() string {
@@ -224,7 +224,7 @@ func (cfg Config) String() string {
 	b.WriteString("baseURL='" + cfg.BaseURL + "'")
 	b.WriteString(" srvAddr='" + cfg.SrvAddr + "'")
 	b.WriteString(" secret='*****'")
-	b.WriteString(" dbType='" + cfg.DbType + "'")
+	b.WriteString(" dbType='" + cfg.DBType + "'")
 	b.WriteString(" deleteFlushInterval=" + cfg.DeleteFlushInterval.String())
 	if cfg.StorageFileName != "" {
 		b.WriteString(" fileName='" + cfg.StorageFileName + "'")
@@ -252,7 +252,7 @@ func (cfg Config) validate() (retErr error) {
 	if cfg.SrvAddr == "" {
 		retErr = multierror.Append(retErr, errors.New("mising server address"))
 	}
-	if cfg.DbType != dbInmem && cfg.DbType != dbPostgres {
+	if cfg.DBType != dbInmem && cfg.DBType != dbPostgres {
 		retErr = multierror.Append(retErr, errors.New("invalid storage type"))
 	}
 
@@ -268,8 +268,8 @@ func newConfig(opts ...configOption) Config {
 		BaseURL:             baseURLDefault,
 		SrvAddr:             srvAddrDefault,
 		StorageFileName:     fileStorageDefault,
-		InmemFlushInterval:  inmemFlushInterval,
-		DeleteFlushInterval: deleteFlushInterval,
+		InmemFlushInterval:  defaultInmemFlushInterval,
+		DeleteFlushInterval: defaultDeleteFlushInterval,
 		DSN:                 "", // значения по умолчанию будут внесены функцией newConfig.
 		EnableHTTPS:         false,
 	}
@@ -280,10 +280,10 @@ func newConfig(opts ...configOption) Config {
 
 	// Если пользователь передал DSN для Postgres, используем Postgres, игнорируя флаги.
 	if cfg.DSN != "" {
-		cfg.DbType = dbPostgres
+		cfg.DBType = dbPostgres
 	}
 
-	switch cfg.DbType {
+	switch cfg.DBType {
 	case dbPostgres:
 		if cfg.DSN == "" {
 			cfg.DSN = dsnDefault
@@ -291,7 +291,7 @@ func newConfig(opts ...configOption) Config {
 		cfg.StorageFileName = ""
 		cfg.InmemFlushInterval = 0
 	case "":
-		cfg.DbType = dbInmem
+		cfg.DBType = dbInmem
 		cfg.DSN = ""
 	case dbInmem:
 		cfg.DSN = ""
@@ -311,7 +311,6 @@ func withFile(filename string) configOption {
 		if err := json.NewDecoder(f).Decode(&cfg); err != nil {
 			log.Fatalf("config: could not decode file %s: %s", filename, err)
 		}
-		log.Printf("config from the file: %s", cfg)
 	}
 }
 
@@ -328,7 +327,7 @@ func withFlags(sf setFlags) configOption {
 			cfg.Secret = *sf.secret
 		}
 		if sf.dbType != nil {
-			cfg.DbType = *sf.dbType
+			cfg.DBType = *sf.dbType
 		}
 		if sf.storageFileName != nil {
 			cfg.StorageFileName = *sf.storageFileName
