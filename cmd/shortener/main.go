@@ -43,8 +43,8 @@ const (
 	defaultSecret = "секретный ключ, которым шифруются подписи"
 
 	fileStorageDefault = "localhost.db"
-	baseURLDefault     = "http://localhost:8080"
-	srvAddrDefault     = ":8080"
+	baseURLDefault     = "http://localhost:80"
+	srvAddrDefault     = ":80"
 
 	pprofAddr = ":7070"
 
