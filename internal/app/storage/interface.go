@@ -23,6 +23,8 @@ type (
 		// BatchDelete производит мягкое удаление записей из хранилища с ключами <keys>, если их создал пользователь
 		// с указанным id.
 		BatchDelete(ctx context.Context, id uuid.UUID, keys []string) error
+		// Stats возвращает общее количество сокращенных URL и количество пользователей в сервисе.
+		Stats(ctx context.Context) (urls int, users int, err error)
 		// Close  завершает работу хранилища
 		Close()
 		// Ping проверяет соединение с хранилищем

@@ -197,3 +197,24 @@ func (r Repo) BatchDelete(ctx context.Context, id uuid.UUID, keys []string) erro
 	}
 	return tx.Commit()
 }
+
+// Stats - реализация метода интерфейса storage.Storage.
+func (r Repo) Stats(ctx context.Context) (urls int, users int, err error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT id FROM repo WHERE NOT deleted`)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer rows.Close()
+	userMap := make(map[string]struct{})
+	urls = 0
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return 0, 0, err
+		}
+		urls++
+		userMap[id] = struct{}{}
+	}
+
+	return urls, len(userMap), nil
+}

@@ -237,6 +237,8 @@ func (s Shortener) UserURLs(w http.ResponseWriter, r *http.Request) {
 	if err := enc.Encode(userURLs); err != nil {
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)
 		log.Printf("shortener: %v", err)
+
+		return
 	}
 }
 
@@ -350,6 +352,34 @@ func (s Shortener) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusAccepted)
+}
+
+// Stats предоставляет информацию о количестве сокращенных URL и о количестве пользователей.
+// информация предоставляется только по запросу с доверенной подсети.
+//
+// GET /api/internal/stats
+func (s Shortener) Stats(w http.ResponseWriter, r *http.Request) {
+	type stats struct {
+		URLs  int `json:"urls"`
+		Users int `json:"users"`
+	}
+	urls, users, err := s.db.Stats(r.Context())
+	if err != nil {
+		log.Printf("shortener: stats: %v", err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
+	st := stats{
+		URLs:  urls,
+		Users: users,
+	}
+	if err := json.NewEncoder(w).Encode(st); err != nil {
+		log.Printf("shortener: stats: %v", err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
 }
 
 // generateKey создает рандомную строку из строчных букв и цифр. Длина строки задана в глобальной переменной keyLength.

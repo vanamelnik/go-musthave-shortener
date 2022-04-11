@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -41,8 +42,6 @@ const (
 
 	defaultDeleteFlushInterval = time.Millisecond
 
-	defaultSecret = "секретный ключ, которым шифруются подписи"
-
 	fileStorageDefault = "localhost.db"
 	baseURLDefault     = "http://localhost:8080"
 	srvAddrDefault     = ":8080"
@@ -65,6 +64,7 @@ type setFlags struct {
 	storageFileName     *string
 	dsn                 *string
 	enableHTTPS         *bool
+	trustedSubnet       *string
 	deleteFlushInterval *time.Duration
 }
 
@@ -75,11 +75,12 @@ func getFlags() setFlags {
 	srvAddr := flag.String("a", srvAddrDefault, "Server address")
 	baseURL := flag.String("b", baseURLDefault, "Base URL")
 	secret := flag.String("p", "*****", "Secret key for hashing cookies") // чтобы ключ по умолчанию не отображался в usage, придется действовать из-за угла))
-	dbType := flag.String("t", dbInmem, "Storage type (default inmem)\n- inmem\t\tin-memory storage periodically written to .gob file\n"+
+	dbType := flag.String("r", dbInmem, "Storage type (default inmem)\n- inmem\t\tin-memory storage periodically written to .gob file\n"+
 		"- postgres\tPostgreSQL database")
 	storageFileName := flag.String("f", fileStorageDefault, "File storage path")
 	dsn := flag.String("d", "", "Database DSN")
 	enableHTTPS := flag.Bool("s", false, "enable HTTPS")
+	trustedSubnet := flag.String("t", "", "Trusted subnet for internal requests")
 	flag.IntVar(&flushInterval, "F", int(defaultDeleteFlushInterval/time.Millisecond), "Flush interval for accumulate data to delete in milliseconds")
 	flag.Parse()
 
@@ -96,7 +97,7 @@ func getFlags() setFlags {
 			sf.baseURL = baseURL
 		case "p":
 			sf.secret = secret
-		case "t":
+		case "r":
 			sf.dbType = dbType
 		case "f":
 			sf.storageFileName = storageFileName
@@ -106,6 +107,8 @@ func getFlags() setFlags {
 			sf.enableHTTPS = enableHTTPS
 		case "F":
 			sf.deleteFlushInterval = &delFlushInterval
+		case "t":
+			sf.trustedSubnet = trustedSubnet
 		}
 	})
 
@@ -172,6 +175,10 @@ func main() {
 	router.HandleFunc("/api/user/urls", s.UserURLs).Methods(http.MethodGet)
 	router.HandleFunc("/api/user/urls", s.DeleteURLs).Methods(http.MethodDelete)
 
+	internal := router.PathPrefix("/api/internal").Subrouter()
+	internal.HandleFunc("/stats", s.Stats).Methods(http.MethodGet)
+	internal.Use(middleware.SubnetCheckerMdlw(cfg.TrustedSubnet))
+
 	router.Use(middleware.CookieMdlw(cfg.Secret), middleware.GzipMdlw)
 
 	server := http.Server{
@@ -218,6 +225,7 @@ type Config struct {
 	EnableHTTPS         bool          `json:"enable_https"`
 	InmemFlushInterval  time.Duration `json:"inmem_flush_interval"`
 	DeleteFlushInterval time.Duration `json:"delete_flush_interval"`
+	TrustedSubnet       string        `json:"trusted_subnet"`
 }
 
 func (cfg Config) String() string {
@@ -235,6 +243,9 @@ func (cfg Config) String() string {
 	}
 	if cfg.DSN != "" {
 		b.WriteString(" dsn='" + cfg.DSN + "'")
+	}
+	if cfg.TrustedSubnet != "" {
+		b.WriteString(" trustedSubnet=" + cfg.TrustedSubnet)
 	}
 	if cfg.EnableHTTPS {
 		b.WriteString(" enableHTTPS: yes")
@@ -255,6 +266,11 @@ func (cfg Config) validate() (retErr error) {
 	}
 	if cfg.DBType != dbInmem && cfg.DBType != dbPostgres {
 		retErr = multierror.Append(retErr, errors.New("invalid storage type"))
+	}
+	if cfg.TrustedSubnet != "" {
+		if _, _, err := net.ParseCIDR(cfg.TrustedSubnet); err != nil {
+			retErr = multierror.Append(retErr, fmt.Errorf("incorrect subnet: %s", err))
+		}
 	}
 
 	return
@@ -342,6 +358,9 @@ func withFlags(sf setFlags) configOption {
 		if sf.deleteFlushInterval != nil {
 			cfg.DeleteFlushInterval = *sf.deleteFlushInterval
 		}
+		if sf.trustedSubnet != nil {
+			cfg.TrustedSubnet = *sf.trustedSubnet
+		}
 	}
 }
 
@@ -353,6 +372,7 @@ func withEnv() configOption {
 			"FILE_STORAGE_PATH": &cfg.StorageFileName,
 			"DATABASE_DSN":      &cfg.DSN,
 			"HASH_KEY":          &cfg.Secret,
+			"TRUSTED_SUBNET":    &cfg.TrustedSubnet,
 		}
 
 		for v := range env {

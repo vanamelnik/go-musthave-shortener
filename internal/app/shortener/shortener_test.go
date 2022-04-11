@@ -215,6 +215,10 @@ func (ms MockStorage) Ping() error {
 	return nil
 }
 
+func (ms MockStorage) Stats(ctx context.Context) (urls int, users int, err error) {
+	return 0, 0, nil
+}
+
 func TestAPIShorten(t *testing.T) {
 	rand.Seed(1)
 	const fakeKey = "fpllngzi" // Первый ключ, генерируемый при rand.Seed(1)

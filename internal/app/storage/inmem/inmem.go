@@ -218,6 +218,21 @@ func (db *DB) BatchDelete(ctx context.Context, id uuid.UUID, keys []string) erro
 	return nil
 }
 
+// Stats - реализация метода интерфейса storage.Storage.
+func (db *DB) Stats(ctx context.Context) (urls int, users int, err error) {
+	urls = 0
+	userMap := make(map[uuid.UUID]struct{})
+	for _, row := range db.repo {
+		if row.Deleted { // не учитываем удаленные записи
+			continue
+		}
+		urls++
+		userMap[row.SessionID] = struct{}{}
+	}
+
+	return urls, len(userMap), nil
+}
+
 func (db *DB) Ping() error {
 	return nil
 }
