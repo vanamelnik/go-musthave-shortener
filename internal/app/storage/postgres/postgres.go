@@ -201,7 +201,7 @@ func (r Repo) BatchDelete(ctx context.Context, id uuid.UUID, keys []string) erro
 // Stats - реализация метода интерфейса storage.Storage.
 func (r Repo) Stats(ctx context.Context) (urls int, users int, err error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT id FROM repo WHERE NOT deleted`)
-	if err != nil {
+	if err != nil || rows.Err() != nil {
 		return 0, 0, err
 	}
 	defer rows.Close()
