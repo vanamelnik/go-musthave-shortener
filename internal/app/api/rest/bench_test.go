@@ -1,4 +1,4 @@
-package shortener_test
+package rest
 
 import (
 	"context"
@@ -36,10 +36,11 @@ func BenchmarkInmem(b *testing.B) {
 		require.NoError(b, os.Remove("tmp.db"))
 	}()
 	s := shortener.NewShortener(baseURL, db, dataloader.DataLoader{})
+	api := NewAPI(s)
 	keys := make([]string, 0, 10000)
 
-	b.Run("Shorten URLs and store them in inmemory storage", shortenBenchmark(s, &keys))
-	b.Run("Decode URLs", getRedirectBenchmark(s, keys))
+	b.Run("Shorten URLs and store them in inmemory storage", shortenBenchmark(&api, &keys))
+	b.Run("Decode URLs", getRedirectBenchmark(&api, keys))
 }
 
 func BenchmarkPostgres(b *testing.B) {
@@ -48,14 +49,15 @@ func BenchmarkPostgres(b *testing.B) {
 	defer db.Close()
 	dl := dataloader.NewDataLoader(context.Background(), db.BatchDelete, time.Millisecond)
 	s := shortener.NewShortener(baseURL, db, dl)
+	api := NewAPI(s)
 	defer dl.Close()
 	keys := make([]string, 0, 10000)
-	b.Run("Shorten URLs and store them in postgres storage", shortenBenchmark(s, &keys))
-	b.Run("Decode URLs", getRedirectBenchmark(s, keys))
+	b.Run("Shorten URLs and store them in postgres storage", shortenBenchmark(&api, &keys))
+	b.Run("Decode URLs", getRedirectBenchmark(&api, keys))
 
 }
 
-func shortenBenchmark(s *shortener.Shortener, keys *[]string) func(b *testing.B) {
+func shortenBenchmark(api *API, keys *[]string) func(b *testing.B) {
 	return func(b *testing.B) {
 		id := uuid.New()
 		for i := 0; i < b.N; i++ {
@@ -64,7 +66,7 @@ func shortenBenchmark(s *shortener.Shortener, keys *[]string) func(b *testing.B)
 			ctx := appContext.WithID(r.Context(), id)
 			r = r.WithContext(ctx)
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(s.ShortenURL)
+			h := http.HandlerFunc(api.ShortenURL)
 			h.ServeHTTP(w, r)
 			res := w.Result()
 			key, err := io.ReadAll(res.Body)
@@ -77,7 +79,7 @@ func shortenBenchmark(s *shortener.Shortener, keys *[]string) func(b *testing.B)
 	}
 }
 
-func getRedirectBenchmark(s *shortener.Shortener, keys []string) func(b *testing.B) {
+func getRedirectBenchmark(api *API, keys []string) func(b *testing.B) {
 	return func(b *testing.B) {
 		j := 0
 		for i := 0; i < b.N; i++ {
@@ -87,7 +89,7 @@ func getRedirectBenchmark(s *shortener.Shortener, keys []string) func(b *testing
 			r = mux.SetURLVars(r, map[string]string{"id": strings.TrimPrefix(url.Path, "/")})
 
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(s.DecodeURL)
+			h := http.HandlerFunc(api.DecodeURL)
 			h.ServeHTTP(w, r)
 			res := w.Result()
 			defer res.Body.Close()

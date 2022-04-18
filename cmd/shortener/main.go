@@ -20,6 +20,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-multierror"
+	"github.com/vanamelnik/go-musthave-shortener/internal/app/api/rest"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/dataloader"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/middleware"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/shortener"
@@ -164,19 +165,20 @@ func main() {
 	defer dl.Close()
 
 	s := shortener.NewShortener(cfg.BaseURL, db, dl)
+	rest := rest.NewAPI(s)
 	router := mux.NewRouter()
 
-	router.HandleFunc("/ping", s.Ping).Methods(http.MethodGet)
+	router.HandleFunc("/ping", rest.Ping).Methods(http.MethodGet)
 
-	router.HandleFunc("/{id}", s.DecodeURL).Methods(http.MethodGet)
-	router.HandleFunc("/", s.ShortenURL).Methods(http.MethodPost)
-	router.HandleFunc("/api/shorten", s.APIShortenURL).Methods(http.MethodPost)
-	router.HandleFunc("/api/shorten/batch", s.BatchShortenURL).Methods(http.MethodPost)
-	router.HandleFunc("/api/user/urls", s.UserURLs).Methods(http.MethodGet)
-	router.HandleFunc("/api/user/urls", s.DeleteURLs).Methods(http.MethodDelete)
+	router.HandleFunc("/{id}", rest.DecodeURL).Methods(http.MethodGet)
+	router.HandleFunc("/", rest.ShortenURL).Methods(http.MethodPost)
+	router.HandleFunc("/api/shorten", rest.APIShortenURL).Methods(http.MethodPost)
+	router.HandleFunc("/api/shorten/batch", rest.BatchShortenURL).Methods(http.MethodPost)
+	router.HandleFunc("/api/user/urls", rest.UserURLs).Methods(http.MethodGet)
+	router.HandleFunc("/api/user/urls", rest.DeleteURLs).Methods(http.MethodDelete)
 
 	internal := router.PathPrefix("/api/internal").Subrouter()
-	internal.HandleFunc("/stats", s.Stats).Methods(http.MethodGet)
+	internal.HandleFunc("/stats", rest.Stats).Methods(http.MethodGet)
 	internal.Use(middleware.SubnetCheckerMdlw(cfg.TrustedSubnet))
 
 	router.Use(middleware.CookieMdlw(cfg.Secret), middleware.GzipMdlw)

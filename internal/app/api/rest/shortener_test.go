@@ -1,4 +1,4 @@
-package shortener_test
+package rest
 
 import (
 	"context"
@@ -130,7 +130,7 @@ func TestShortener(t *testing.T) {
 	}()
 
 	s := shortener.NewShortener("http://localhost:8080", db, dataloader.DataLoader{})
-
+	api := NewAPI(s)
 	// запускаем тесты POST
 	for _, tc := range testsPost {
 		t.Run(tc.name, func(t *testing.T) {
@@ -138,7 +138,7 @@ func TestShortener(t *testing.T) {
 			ctx := appContext.WithID(r.Context(), uuid.New())
 			r = r.WithContext(ctx)
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(s.ShortenURL)
+			h := http.HandlerFunc(api.ShortenURL)
 			h.ServeHTTP(w, r)
 
 			res := w.Result()
@@ -165,7 +165,7 @@ func TestShortener(t *testing.T) {
 			r := httptest.NewRequest("GET", "/"+path, nil)
 			r = mux.SetURLVars(r, map[string]string{"id": path}) // чтобы горилла отработала на совесть
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(s.DecodeURL)
+			h := http.HandlerFunc(api.DecodeURL)
 			h.ServeHTTP(w, r)
 
 			res := w.Result()
@@ -261,13 +261,14 @@ func TestAPIShorten(t *testing.T) {
 		},
 	}
 	s := shortener.NewShortener("http://localhost:8080", &MockStorage{}, dataloader.DataLoader{})
+	api := NewAPI(s)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest("POST", "/api/shorten", strings.NewReader(tc.body))
 			ctx := appContext.WithID(r.Context(), uuid.New())
 			r = r.WithContext(ctx)
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(s.APIShortenURL)
+			h := http.HandlerFunc(api.APIShortenURL)
 			h.ServeHTTP(w, r)
 
 			res := w.Result()

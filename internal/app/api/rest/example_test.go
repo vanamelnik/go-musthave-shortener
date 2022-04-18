@@ -1,4 +1,4 @@
-package shortener
+package rest
 
 import (
 	"encoding/json"
