@@ -1,8 +1,8 @@
 syntax="proto3";
 
-option go_package = "github.com/vanamelnik/go-musthave-shortener/api/grpc";
+option go_package = "github.com/vanamelnik/go-musthave-shortener/internal/app/api/grpc/proto";
 
-package grpc;
+package proto;
 
 message ShortenURLRequest {
     string  url = 1;
