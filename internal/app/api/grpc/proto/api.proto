@@ -1,0 +1,83 @@
+syntax="proto3";
+
+option go_package = "github.com/vanamelnik/go-musthave-shortener/api/grpc";
+
+package grpc;
+
+message ShortenURLRequest {
+    string  url = 1;
+    string user_id =2;
+}
+message ShortenURLResponse {
+    string result = 1;
+    string user_id =2;
+    string error = 3;
+}
+
+message DecodeURLRequest {
+    string short_url = 1;
+}
+message DecodeURLResqponse {
+    string original_url = 1;
+    string error = 2;
+}
+
+message GetUserURLsRequest {
+    string  user_id = 1;
+}
+message GetUserURLsResponse {
+    message Record {
+        string short_url = 1;
+        string original_url = 2;
+    }
+    repeated Record records = 1;
+    string error = 2;
+}
+
+message BatchShortenRequest {
+    message BatchShortenReqStruct {
+        string correlation_id = 1;
+        string url = 2;
+    }
+    repeated BatchShortenReqStruct batch_shorten_request = 1;
+    string user_id = 2;
+}
+message BatchShortenResponse {
+    message BatchShortenRespStruct {
+        string correlation_id = 1;
+        string short_url = 2;
+    }
+    repeated BatchShortenRespStruct batch_shorten_response = 1;
+    string user_id =2;
+    string error = 3;
+}
+
+message DeleteURLsRequest {
+    repeated string urls = 1;
+    string user_id = 2;
+}
+message DeleteURLsResqponse {
+    string error = 1;
+}
+
+message StatsResponse {
+    int32 urls = 1;
+    int32 useres = 2;
+    string error = 3;
+}
+
+message PingResponse {
+    bool ok = 1;
+}
+
+message Empty {}
+
+service shortener {
+    rpc ShortenURL(ShortenURLRequest) returns (ShortenURLResponse);
+    rpc DecodeURL(DecodeURLRequest) returns (DecodeURLResqponse);
+    rpc GetUserURLs(GetUserURLsRequest) returns (GetUserURLsResponse);
+    rpc BatchShorten(BatchShortenRequest) returns (BatchShortenResponse);
+    rpc DeleteURLs(DeleteURLsRequest) returns (DeleteURLsResqponse);
+    rpc Stats(Empty) returns (StatsResponse);
+    rpc Ping(Empty) returns (PingResponse);
+}
