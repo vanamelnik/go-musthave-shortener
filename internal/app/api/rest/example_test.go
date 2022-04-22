@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func ExampleShortener_APIShortenURL() {
+func ExampleRest_APIShortenURL() {
 	request := `{"url":"http://google.com"}`
 	result := struct {
 		Result string `json:"result"`
@@ -25,7 +25,7 @@ func ExampleShortener_APIShortenURL() {
 	fmt.Printf("Short url for http://google.com: %s", result.Result)
 }
 
-func ExampleShortener_ShortenURL() {
+func ExampleRest_ShortenURL() {
 	url := "http://youtube.com"
 	resp, err := http.Post("localhost:8080/api/shorten", "text/plain", strings.NewReader(url))
 	if err != nil {
@@ -72,7 +72,7 @@ func ExampleShortener_BatchShortenURL() {
 	}
 }
 
-func ExampleShortener_DeleteURLs() {
+func ExampleRest_DeleteURLs() {
 	reqBody := `["a2b38tjg", "8sfj93bf"]` // Ключи для удаления
 	c := http.Client{}
 	r, err := http.NewRequest(http.MethodDelete, "localhost:8080", strings.NewReader(reqBody))

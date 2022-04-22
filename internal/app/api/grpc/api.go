@@ -8,14 +8,20 @@ import (
 	"google.golang.org/grpc"
 )
 
-type API struct {
+type server struct {
 	pb.UnimplementedShortenerServer
-	shortener shortener.Shortener
+	shortener *shortener.Shortener
 }
 
-func (api API) Ping(ctx context.Context, in *pb.Empty, opts ...grpc.CallOption) (*pb.PingResponse, error) {
+func NewServer(shortener *shortener.Shortener) *grpc.Server {
+	s := grpc.NewServer()
+	pb.RegisterShortenerServer(s, &server{shortener: shortener})
+	return s
+}
+
+func (grpc server) Ping(ctx context.Context, in *pb.Empty) (*pb.PingResponse, error) {
 	result := true
-	if err := api.shortener.Ping(); err != nil {
+	if err := grpc.shortener.Ping(); err != nil {
 		result = false
 	}
 	return &pb.PingResponse{
@@ -23,8 +29,8 @@ func (api API) Ping(ctx context.Context, in *pb.Empty, opts ...grpc.CallOption) 
 	}, nil
 }
 
-func (api API) Stats(ctx context.Context, in *pb.Empty, opts ...grpc.CallOption) (*pb.StatsResponse, error) {
-	urls, users, err := api.shortener.Stats(ctx)
+func (grpc server) Stats(ctx context.Context, in *pb.Empty) (*pb.StatsResponse, error) {
+	urls, users, err := grpc.shortener.Stats(ctx)
 	if err != nil {
 		return &pb.StatsResponse{
 			Error: err.Error(),
@@ -33,6 +39,6 @@ func (api API) Stats(ctx context.Context, in *pb.Empty, opts ...grpc.CallOption)
 	return &pb.StatsResponse{
 		Urls:   int32(urls),
 		Useres: int32(users),
-		Error:  nil,
+		Error:  "",
 	}, nil
 }

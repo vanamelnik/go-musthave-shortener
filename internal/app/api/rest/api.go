@@ -14,19 +14,19 @@ import (
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage"
 )
 
-type API struct {
+type Rest struct {
 	shortener *shortener.Shortener
 }
 
-func NewAPI(s *shortener.Shortener) API {
-	return API{shortener: s}
+func NewRest(s *shortener.Shortener) Rest {
+	return Rest{shortener: s}
 }
 
 // Ping проверяет соединение с базой данных.
 //
 // GET /ping
-func (api API) Ping(w http.ResponseWriter, r *http.Request) {
-	if err := api.shortener.Ping(); err != nil {
+func (rest Rest) Ping(w http.ResponseWriter, r *http.Request) {
+	if err := rest.shortener.Ping(); err != nil {
 		log.Printf("storage: ping: %v", err)
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)
 
@@ -39,7 +39,7 @@ func (api API) Ping(w http.ResponseWriter, r *http.Request) {
 // возвращает в ответе объект {"result": "<shorten_url>"}
 //
 // POST /api/shorten
-func (api API) APIShortenURL(w http.ResponseWriter, r *http.Request) {
+func (rest Rest) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 	type Request struct {
 		URL string `json:"url"`
 	}
@@ -62,7 +62,7 @@ func (api API) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	shortURL, err := api.shortener.ShortenURL(r.Context(), id, urlReq.URL)
+	shortURL, err := rest.shortener.ShortenURL(r.Context(), id, urlReq.URL)
 	statusCode := http.StatusCreated
 	if err != nil {
 		log.Printf("APIShortenURL: %v", err)
@@ -70,7 +70,7 @@ func (api API) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 
 		if errors.As(err, &errURLAlreadyExists) {
 			statusCode = http.StatusConflict
-			shortURL = fmt.Sprintf("%s/%s", api.shortener.BaseURL, errURLAlreadyExists.Key)
+			shortURL = fmt.Sprintf("%s/%s", rest.shortener.BaseURL, errURLAlreadyExists.Key)
 		} else {
 			http.Error(w, "Wrong URL", http.StatusBadRequest)
 
@@ -91,7 +91,7 @@ func (api API) APIShortenURL(w http.ResponseWriter, r *http.Request) {
 // сохраняет его в БД и возвращает строку сокращенного url в теле ответа.
 //
 // POST /
-func (api API) ShortenURL(w http.ResponseWriter, r *http.Request) {
+func (rest Rest) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	id, err := context.ID(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
 	if err != nil {
 		log.Printf("shortener: %v", err)
@@ -108,13 +108,13 @@ func (api API) ShortenURL(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	shortURL, err := api.shortener.ShortenURL(r.Context(), id, string(body))
+	shortURL, err := rest.shortener.ShortenURL(r.Context(), id, string(body))
 	if err != nil {
 		log.Printf("shortener: %v", err)
 		var errURLAlreadyExists *storage.ErrURLArlreadyExists
 		if errors.As(err, &errURLAlreadyExists) {
 			w.WriteHeader(http.StatusConflict)
-			shortURL = fmt.Sprintf("%s/%s", api.shortener.BaseURL, errURLAlreadyExists.Key)
+			shortURL = fmt.Sprintf("%s/%s", rest.shortener.BaseURL, errURLAlreadyExists.Key)
 			// nolint:errcheck
 			w.Write([]byte(shortURL))
 
@@ -132,7 +132,7 @@ func (api API) ShortenURL(w http.ResponseWriter, r *http.Request) {
 // DecodeURL принимает короткий параметр и производит редирект на изначальный url с кодом 307.
 //
 // GET /{id}
-func (api API) DecodeURL(w http.ResponseWriter, r *http.Request) {
+func (rest Rest) DecodeURL(w http.ResponseWriter, r *http.Request) {
 	key, ok := mux.Vars(r)["id"]
 	if !ok || len(key) != 8 {
 		log.Printf("shortener: DecodeURL: wrong key '%v'", key)
@@ -140,7 +140,7 @@ func (api API) DecodeURL(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	url, err := api.shortener.DecodeURL(r.Context(), key)
+	url, err := rest.shortener.DecodeURL(r.Context(), key)
 	if err != nil {
 		log.Printf("shortener: DecodeURL: could not find url with key %v: %v", key, err)
 		if errors.Is(err, storage.ErrDeleted) {
@@ -158,7 +158,7 @@ func (api API) DecodeURL(w http.ResponseWriter, r *http.Request) {
 // UserURLs возвращает в ответе json с массивом записей всех URL, созданных текущем пользователем
 //
 // GET /api/user/urls
-func (api API) UserURLs(w http.ResponseWriter, r *http.Request) {
+func (rest Rest) UserURLs(w http.ResponseWriter, r *http.Request) {
 	type urlRec struct {
 		ShortURL    string `json:"short_url"`
 		OriginalURL string `json:"original_url"`
@@ -172,7 +172,7 @@ func (api API) UserURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list := api.shortener.GetAll(r.Context(), id)
+	list := rest.shortener.GetAll(r.Context(), id)
 	log.Printf("[INF] shortener: requested entries for id=%s, found %d items.", id, len(list))
 	if len(list) == 0 {
 		w.WriteHeader(http.StatusNoContent)
@@ -182,7 +182,7 @@ func (api API) UserURLs(w http.ResponseWriter, r *http.Request) {
 	userURLs := make([]urlRec, 0, len(list))
 	for key, url := range list {
 		userURLs = append(userURLs, urlRec{
-			ShortURL:    fmt.Sprintf("%s/%s", api.shortener.BaseURL, key),
+			ShortURL:    fmt.Sprintf("%s/%s", rest.shortener.BaseURL, key),
 			OriginalURL: url,
 		})
 	}
@@ -201,7 +201,7 @@ func (api API) UserURLs(w http.ResponseWriter, r *http.Request) {
 // BatchShortenURL формирует ключи для переданных через тело запроса URL и передает данные на сохранение в базу данных.
 //
 // POST /api/shorten/batch
-func (api API) BatchShortenURL(w http.ResponseWriter, r *http.Request) {
+func (rest Rest) BatchShortenURL(w http.ResponseWriter, r *http.Request) {
 	id, err := context.ID(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
 	if err != nil {
 		log.Printf("shortener: Batch: %v", err)
@@ -219,7 +219,7 @@ func (api API) BatchShortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := api.shortener.BatchShortenURL(r.Context(), id, batchReq)
+	resp, err := rest.shortener.BatchShortenURL(r.Context(), id, batchReq)
 	if err != nil {
 		if errors.Is(err, storage.ErrBatchURLUniqueViolation) {
 			http.Error(w, err.Error(), http.StatusConflict)
@@ -245,7 +245,7 @@ func (api API) BatchShortenURL(w http.ResponseWriter, r *http.Request) {
 // Ключи передаются в формате ["<key1>", "<key2>"...]
 //
 // DELETE /api/user/urls
-func (api API) DeleteURLs(w http.ResponseWriter, r *http.Request) {
+func (rest Rest) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 	id, err := context.ID(r.Context()) // Значение uuid добавлено в контекст запроса middleware'й.
 	if err != nil {
 		log.Printf("shortener: delete: %v", err)
@@ -270,7 +270,7 @@ func (api API) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := api.shortener.BatchDelete(r.Context(), id, keys); err != nil {
+	if err := rest.shortener.BatchDelete(r.Context(), id, keys); err != nil {
 		log.Printf("shortener: delete: %v", err)
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)
 
@@ -284,12 +284,12 @@ func (api API) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 // информация предоставляется только по запросу с доверенной подсети.
 //
 // GET /api/internal/stats
-func (api API) Stats(w http.ResponseWriter, r *http.Request) {
+func (rest Rest) Stats(w http.ResponseWriter, r *http.Request) {
 	type stats struct {
 		URLs  int `json:"urls"`
 		Users int `json:"users"`
 	}
-	urls, users, err := api.shortener.Stats(r.Context())
+	urls, users, err := rest.shortener.Stats(r.Context())
 	if err != nil {
 		log.Printf("shortener: stats: %v", err)
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)

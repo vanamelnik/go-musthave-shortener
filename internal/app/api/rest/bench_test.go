@@ -36,7 +36,7 @@ func BenchmarkInmem(b *testing.B) {
 		require.NoError(b, os.Remove("tmp.db"))
 	}()
 	s := shortener.NewShortener(baseURL, db, dataloader.DataLoader{})
-	api := NewAPI(s)
+	api := NewRest(s)
 	keys := make([]string, 0, 10000)
 
 	b.Run("Shorten URLs and store them in inmemory storage", shortenBenchmark(&api, &keys))
@@ -49,7 +49,7 @@ func BenchmarkPostgres(b *testing.B) {
 	defer db.Close()
 	dl := dataloader.NewDataLoader(context.Background(), db.BatchDelete, time.Millisecond)
 	s := shortener.NewShortener(baseURL, db, dl)
-	api := NewAPI(s)
+	api := NewRest(s)
 	defer dl.Close()
 	keys := make([]string, 0, 10000)
 	b.Run("Shorten URLs and store them in postgres storage", shortenBenchmark(&api, &keys))
@@ -57,7 +57,7 @@ func BenchmarkPostgres(b *testing.B) {
 
 }
 
-func shortenBenchmark(api *API, keys *[]string) func(b *testing.B) {
+func shortenBenchmark(api *Rest, keys *[]string) func(b *testing.B) {
 	return func(b *testing.B) {
 		id := uuid.New()
 		for i := 0; i < b.N; i++ {
@@ -79,7 +79,7 @@ func shortenBenchmark(api *API, keys *[]string) func(b *testing.B) {
 	}
 }
 
-func getRedirectBenchmark(api *API, keys []string) func(b *testing.B) {
+func getRedirectBenchmark(api *Rest, keys []string) func(b *testing.B) {
 	return func(b *testing.B) {
 		j := 0
 		for i := 0; i < b.N; i++ {
