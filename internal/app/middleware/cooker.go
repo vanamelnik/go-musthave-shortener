@@ -82,7 +82,7 @@ func analyseCookies(r *http.Request, h hash.Hash) (uuid.UUID, bool) {
 // newSession создает новые uuid и токен пользователя, сохраняет их в cookie.
 // Возвращает ошибку в маловероятном случае сбоя генерации нового uuid
 func newSession(w http.ResponseWriter, h hash.Hash) (uuid.UUID, error) {
-	id, err := uuid.NewRandom()
+	id, err := GenerateUserID()
 	if err != nil {
 		log.Printf("CookieMdlw: cannot generate an uuid: %v", err)
 		return uuid.Nil, err
@@ -94,6 +94,16 @@ func newSession(w http.ResponseWriter, h hash.Hash) (uuid.UUID, error) {
 
 	http.SetCookie(w, &http.Cookie{Name: "uuid", Path: "/", Value: id.String()})
 	http.SetCookie(w, &http.Cookie{Name: "token", Path: "/", Value: token})
+
+	return id, nil
+}
+
+func GenerateUserID() (uuid.UUID, error) {
+	id, err := uuid.NewRandom()
+	if err != nil {
+		log.Printf("CookieMdlw: cannot generate an uuid: %v", err)
+		return uuid.Nil, err
+	}
 
 	return id, nil
 }

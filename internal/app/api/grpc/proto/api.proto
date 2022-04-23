@@ -35,19 +35,19 @@ message GetUserURLsResponse {
 }
 
 message BatchShortenRequest {
-    message BatchShortenReqStruct {
+    message Records {
         string correlation_id = 1;
         string url = 2;
     }
-    repeated BatchShortenReqStruct batch_shorten_request = 1;
+    repeated Records records = 1;
     string user_id = 2;
 }
 message BatchShortenResponse {
-    message BatchShortenRespStruct {
+    message Records {
         string correlation_id = 1;
         string short_url = 2;
     }
-    repeated BatchShortenRespStruct batch_shorten_response = 1;
+    repeated Records records = 1;
     string user_id =2;
     string error = 3;
 }
@@ -62,7 +62,7 @@ message DeleteURLsResqponse {
 
 message StatsResponse {
     int32 urls = 1;
-    int32 useres = 2;
+    int32 users = 2;
     string error = 3;
 }
 
