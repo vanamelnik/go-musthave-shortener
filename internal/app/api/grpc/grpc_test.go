@@ -80,7 +80,7 @@ func TestShortener(t *testing.T) {
 		resp, err := w.client.DecodeURL(ctx, &pb.DecodeURLRequest{ShortUrl: "invalidkey"})
 		assert.NoError(t, err)
 		assert.NotEmpty(t, resp.Error)
-		t.Logf("error message: %s", err)
+		t.Logf("error message: %s", resp.Error)
 	})
 	t.Run("Stats", func(t *testing.T) {
 		resp, err := w.client.Stats(ctx, &pb.Empty{})
@@ -127,7 +127,20 @@ func TestBatchShortenAndDelete(t *testing.T) {
 		assert.Equal(t, len(records), len(resp.Records))
 		t.Logf("response records: %+v", resp.Records)
 	})
-	_ = userID
+	t.Run("Add 1 more URL by the same user", func(t *testing.T) {
+		resp, err := w.client.ShortenURL(ctx, &pb.ShortenURLRequest{
+			Url:    "http://onemoreurl.io",
+			UserId: userID,
+		})
+		assert.NoError(t, err)
+		assert.Empty(t, resp.Error)
+	})
+	t.Run("List URLs", func(t *testing.T) {
+		resp, err := w.client.GetUserURLs(ctx, &pb.GetUserURLsRequest{UserId: userID})
+		assert.NoError(t, err)
+		assert.Equal(t, 6, len(resp.Records)) // 5+1
+		t.Logf("URLs list of user %s: %+v", userID, resp.Records)
+	})
 }
 
 type workspace struct {

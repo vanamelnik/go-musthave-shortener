@@ -99,6 +99,26 @@ func (s server) BatchShorten(ctx context.Context, r *pb.BatchShortenRequest) (*p
 	return &resp, nil
 }
 
+func (s server) GetUserURLs(ctx context.Context, r *pb.GetUserURLsRequest) (*pb.GetUserURLsResponse, error) {
+	id, err := uuid.Parse(r.UserId)
+	if err != nil {
+		log.Printf("gRPC: GetUserURLs: %s", err)
+		return &pb.GetUserURLsResponse{Error: err.Error()}, nil
+	}
+	result := s.shortener.GetAll(ctx, id)
+	records := make([]*pb.GetUserURLsResponse_Record, 0, len(result))
+	for key, url := range result {
+		records = append(records, &pb.GetUserURLsResponse_Record{
+			ShortUrl:    fmt.Sprintf("%s/%s", s.shortener.BaseURL, key),
+			OriginalUrl: url,
+		})
+	}
+	return &pb.GetUserURLsResponse{
+		Records: records,
+		Error:   "",
+	}, nil
+}
+
 func (s server) Stats(ctx context.Context, in *pb.Empty) (*pb.StatsResponse, error) {
 	urls, users, err := s.shortener.Stats(ctx)
 	if err != nil {

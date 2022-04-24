@@ -23,7 +23,6 @@ const (
 func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	db, err := inmem.NewDB(tmpDbFile, time.Millisecond)
-	defer db.Close()
 	must(err)
 	// в конце удаляем временный файл базы данных
 	defer func() {
@@ -31,6 +30,7 @@ func TestMain(m *testing.M) {
 			log.Fatal(err)
 		}
 	}()
+	defer db.Close()
 	dl := dataloader.NewDataLoader(context.Background(), db.BatchDelete, time.Second)
 	defer dl.Close()
 	s := shortener.NewShortener(baseURL, db, dl)
