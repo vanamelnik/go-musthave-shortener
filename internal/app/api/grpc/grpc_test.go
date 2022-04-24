@@ -2,7 +2,9 @@ package grpc
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	pb "github.com/vanamelnik/go-musthave-shortener/internal/app/api/grpc/proto"
@@ -140,14 +142,39 @@ func TestBatchShortenAndDelete(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Empty(t, resp.Error)
 		assert.Equal(t, 6, len(resp.Records)) // 5+1
-		t.Logf("URLs list of user %s: %+v", userID, resp.Records)
+		t.Logf("URLs list of the user %s: %+v", userID, resp.Records)
 	})
 	t.Run("List urls for non-existing user", func(t *testing.T) {
 		resp, err := w.client.GetUserURLs(ctx, &pb.GetUserURLsRequest{UserId: uuid.NewString()})
 		assert.NoError(t, err)
 		assert.Empty(t, resp.Error)
 		assert.Equal(t, 0, len(resp.Records)) // 5+1
-		t.Logf("length of the list: %d", len(resp.Records))
+	})
+	t.Run("Delete 3 URLs", func(t *testing.T) {
+		respGet, err := w.client.GetUserURLs(ctx, &pb.GetUserURLsRequest{UserId: userID})
+		assert.NoError(t, err)
+		assert.Empty(t, respGet.Error)
+
+		keys := make([]string, 0, 3)
+		for i, rec := range respGet.Records {
+			if i > 2 {
+				break
+			}
+			keys = append(keys, strings.TrimPrefix(rec.ShortUrl, baseURL+"/"))
+		}
+		t.Logf("keys to delete: %v", keys)
+		resp, err := w.client.DeleteURLs(ctx, &pb.DeleteURLsRequest{
+			Keys:   keys,
+			UserId: userID,
+		})
+		assert.NoError(t, err)
+		assert.Empty(t, resp.Error)
+		time.Sleep(2 * time.Millisecond) // wait when dataloader flushes
+		respGet, err = w.client.GetUserURLs(ctx, &pb.GetUserURLsRequest{UserId: userID})
+		assert.NoError(t, err)
+		assert.Empty(t, respGet.Error)
+		assert.Equal(t, 3, len(respGet.Records)) // 6 - 3
+		t.Logf("records after deleting: %+v", respGet.Records)
 	})
 }
 

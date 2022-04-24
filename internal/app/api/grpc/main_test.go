@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 		}
 	}()
 	defer db.Close()
-	dl := dataloader.NewDataLoader(context.Background(), db.BatchDelete, time.Second)
+	dl := dataloader.NewDataLoader(context.Background(), db.BatchDelete, time.Millisecond)
 	defer dl.Close()
 	s := shortener.NewShortener(baseURL, db, dl)
 

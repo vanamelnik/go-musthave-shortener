@@ -119,6 +119,24 @@ func (s server) GetUserURLs(ctx context.Context, r *pb.GetUserURLsRequest) (*pb.
 	}, nil
 }
 
+func (s server) DeleteURLs(ctx context.Context, r *pb.DeleteURLsRequest) (*pb.DeleteURLsResponse, error) {
+	if len(r.Keys) == 0 {
+		return &pb.DeleteURLsResponse{Error: ""}, nil
+	}
+	id, err := uuid.Parse(r.UserId)
+	if err != nil {
+		log.Printf("gRPC: DeleteURLs: %s", err)
+		return &pb.DeleteURLsResponse{Error: err.Error()}, nil
+	}
+
+	if err := s.shortener.BatchDelete(ctx, id, r.Keys); err != nil {
+		log.Printf("gRPC: DeleteURLs: %s", err)
+		return &pb.DeleteURLsResponse{Error: err.Error()}, nil
+	}
+
+	return &pb.DeleteURLsResponse{Error: ""}, nil
+}
+
 func (s server) Stats(ctx context.Context, in *pb.Empty) (*pb.StatsResponse, error) {
 	urls, users, err := s.shortener.Stats(ctx)
 	if err != nil {
