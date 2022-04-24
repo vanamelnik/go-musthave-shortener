@@ -138,8 +138,16 @@ func TestBatchShortenAndDelete(t *testing.T) {
 	t.Run("List URLs", func(t *testing.T) {
 		resp, err := w.client.GetUserURLs(ctx, &pb.GetUserURLsRequest{UserId: userID})
 		assert.NoError(t, err)
+		assert.Empty(t, resp.Error)
 		assert.Equal(t, 6, len(resp.Records)) // 5+1
 		t.Logf("URLs list of user %s: %+v", userID, resp.Records)
+	})
+	t.Run("List urls for non-existing user", func(t *testing.T) {
+		resp, err := w.client.GetUserURLs(ctx, &pb.GetUserURLsRequest{UserId: uuid.NewString()})
+		assert.NoError(t, err)
+		assert.Empty(t, resp.Error)
+		assert.Equal(t, 0, len(resp.Records)) // 5+1
+		t.Logf("length of the list: %d", len(resp.Records))
 	})
 }
 
