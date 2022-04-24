@@ -1,3 +1,9 @@
+/*
+    В данном пакете представлены методы для gRPC-вызовов сервиса Shortener
+
+    Методы GetUserURLs и DeleteURLs принимают ID существующего пользователя.
+    Методы ShortenURL, BatchShortenURL генерируют новый ID пользователя, если он не был передан в запросе.
+*/
 syntax="proto3";
 
 option go_package = "github.com/vanamelnik/go-musthave-shortener/internal/app/api/grpc/proto";

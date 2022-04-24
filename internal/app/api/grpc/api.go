@@ -20,12 +20,14 @@ type server struct {
 	shortener *shortener.Shortener
 }
 
+// NewServer создаёт новый gRPC сервер и регистрирует хендлеры.
 func NewServer(shortener *shortener.Shortener) *grpc.Server {
 	s := grpc.NewServer()
 	pb.RegisterShortenerServer(s, &server{shortener: shortener})
 	return s
 }
 
+// Ping проверяет соединение с текущей базой данных.
 func (s server) Ping(ctx context.Context, in *pb.Empty) (*pb.PingResponse, error) {
 	result := true
 	if err := s.shortener.Ping(); err != nil {
@@ -36,6 +38,7 @@ func (s server) Ping(ctx context.Context, in *pb.Empty) (*pb.PingResponse, error
 	}, nil
 }
 
+// ShortenURL принимает в запросе URL и возвращает сокращенный URL.
 func (s server) ShortenURL(ctx context.Context, r *pb.ShortenURLRequest) (*pb.ShortenURLResponse, error) {
 	resp := pb.ShortenURLResponse{}
 	id, errStr := getUserID(r.UserId)
@@ -55,6 +58,8 @@ func (s server) ShortenURL(ctx context.Context, r *pb.ShortenURLRequest) (*pb.Sh
 	resp.Result = shortURL
 	return &resp, nil
 }
+
+// DecodeURL возвращает оригинальный URL.
 func (s server) DecodeURL(ctx context.Context, r *pb.DecodeURLRequest) (*pb.DecodeURLResqponse, error) {
 	key := strings.TrimPrefix(r.ShortUrl, s.shortener.BaseURL+"/")
 	url, err := s.shortener.DecodeURL(ctx, key)
@@ -68,6 +73,7 @@ func (s server) DecodeURL(ctx context.Context, r *pb.DecodeURLRequest) (*pb.Deco
 	}, nil
 }
 
+// BatchShorten сокращает список URL.
 func (s server) BatchShorten(ctx context.Context, r *pb.BatchShortenRequest) (*pb.BatchShortenResponse, error) {
 	if len(r.Records) == 0 {
 		return &pb.BatchShortenResponse{}, nil
@@ -99,6 +105,7 @@ func (s server) BatchShorten(ctx context.Context, r *pb.BatchShortenRequest) (*p
 	return &resp, nil
 }
 
+// GetUserURLs возвращает список записей OriginalURL/ShortURL для пользователя с указанным ID.
 func (s server) GetUserURLs(ctx context.Context, r *pb.GetUserURLsRequest) (*pb.GetUserURLsResponse, error) {
 	id, err := uuid.Parse(r.UserId)
 	if err != nil {
@@ -119,6 +126,7 @@ func (s server) GetUserURLs(ctx context.Context, r *pb.GetUserURLsRequest) (*pb.
 	}, nil
 }
 
+// DeleteURLs удаляет URL по указанным ключам, принадлежащие пользователю с указанным ID.
 func (s server) DeleteURLs(ctx context.Context, r *pb.DeleteURLsRequest) (*pb.DeleteURLsResponse, error) {
 	if len(r.Keys) == 0 {
 		return &pb.DeleteURLsResponse{Error: ""}, nil
@@ -137,6 +145,7 @@ func (s server) DeleteURLs(ctx context.Context, r *pb.DeleteURLsRequest) (*pb.De
 	return &pb.DeleteURLsResponse{Error: ""}, nil
 }
 
+// Stats возвращает статистику - общее число зарегистрированных пользователей и сокращенных адресов в базе.
 func (s server) Stats(ctx context.Context, in *pb.Empty) (*pb.StatsResponse, error) {
 	urls, users, err := s.shortener.Stats(ctx)
 	if err != nil {
@@ -151,9 +160,9 @@ func (s server) Stats(ctx context.Context, in *pb.Empty) (*pb.StatsResponse, err
 	}, nil
 }
 
-func getUserID(reqUserID string) (uuid.UUID, string) {
+// getUserID возвращает ID пользователя. Если поле reqUserID пустое - генерируется новый ID.
+func getUserID(reqUserID string) (id uuid.UUID, respErr string) {
 	var err error
-	var id uuid.UUID
 	if reqUserID != "" {
 		id, err = uuid.Parse(reqUserID)
 		if err != nil {

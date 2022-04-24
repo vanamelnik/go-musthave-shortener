@@ -23,7 +23,9 @@ const (
 func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	db, err := inmem.NewDB(tmpDbFile, time.Millisecond)
-	must(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 	// в конце удаляем временный файл базы данных
 	defer func() {
 		if err := os.Remove(tmpDbFile); err != nil {
@@ -47,12 +49,4 @@ func TestMain(m *testing.M) {
 		}
 	}()
 	m.Run()
-}
-
-func closeService() {}
-
-func must(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
 }

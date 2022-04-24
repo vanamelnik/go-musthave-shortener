@@ -28,6 +28,7 @@ type ShortenerClient interface {
 	BatchShorten(ctx context.Context, in *BatchShortenRequest, opts ...grpc.CallOption) (*BatchShortenResponse, error)
 	DeleteURLs(ctx context.Context, in *DeleteURLsRequest, opts ...grpc.CallOption) (*DeleteURLsResponse, error)
 	Stats(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StatsResponse, error)
+	// Ping проверяет соединение с базой данных.
 	Ping(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PingResponse, error)
 }
 
@@ -112,6 +113,7 @@ type ShortenerServer interface {
 	BatchShorten(context.Context, *BatchShortenRequest) (*BatchShortenResponse, error)
 	DeleteURLs(context.Context, *DeleteURLsRequest) (*DeleteURLsResponse, error)
 	Stats(context.Context, *Empty) (*StatsResponse, error)
+	// Ping проверяет соединение с базой данных.
 	Ping(context.Context, *Empty) (*PingResponse, error)
 	mustEmbedUnimplementedShortenerServer()
 }
