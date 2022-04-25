@@ -41,7 +41,7 @@ func CookieMdlw(secret string) mux.MiddlewareFunc {
 }
 
 // analyseCookies проверяет наличие кук uuid и token, а также валидность их значений.
-// значение ok == false указывает на необходимость создания новой сессии
+// значение ok == false указывает на необходимость создания новой сессии.
 func analyseCookies(r *http.Request, h hash.Hash) (uuid.UUID, bool) {
 	// проверяем наличие куки uuid
 	cookie, err := r.Cookie("uuid")
@@ -80,7 +80,7 @@ func analyseCookies(r *http.Request, h hash.Hash) (uuid.UUID, bool) {
 }
 
 // newSession создает новые uuid и токен пользователя, сохраняет их в cookie.
-// Возвращает ошибку в маловероятном случае сбоя генерации нового uuid
+// Возвращает ошибку в маловероятном случае сбоя генерации нового uuid.
 func newSession(w http.ResponseWriter, h hash.Hash) (uuid.UUID, error) {
 	id, err := GenerateUserID()
 	if err != nil {

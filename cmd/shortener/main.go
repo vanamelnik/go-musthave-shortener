@@ -31,7 +31,7 @@ const (
 	defaultHost = "go-musthave-shortener.io"
 )
 
-// Информация о версии
+// Информация о версии.
 var (
 	buildVersion string
 	buildDate    string
@@ -93,7 +93,7 @@ func main() {
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 
-	go runMainServer(server, cfg)
+	go runMainServer(&server, cfg)
 	log.Println("Shortener server is listening at " + cfg.SrvAddr)
 
 	go runPprofServer(cfg.PprofAddress)
@@ -107,7 +107,7 @@ func main() {
 	}
 }
 
-func runMainServer(server http.Server, cfg config.Config) {
+func runMainServer(server *http.Server, cfg config.Config) {
 	if !cfg.EnableHTTPS {
 		log.Println(server.ListenAndServe())
 		return
@@ -148,14 +148,15 @@ func runGRPCServer(gRPCPort string, s *shortener.Shortener) {
 }
 
 func displayVersionInfo() {
+	const defaultInfo = "N/A"
 	if buildVersion == "" {
-		buildVersion = "N/A"
+		buildVersion = defaultInfo
 	}
 	if buildDate == "" {
-		buildDate = "N/A"
+		buildDate = defaultInfo
 	}
 	if buildCommit == "" {
-		buildCommit = "N/A"
+		buildCommit = defaultInfo
 	}
 	fmt.Printf("Build version: %s\n", buildVersion)
 	fmt.Printf("Build date: %s\n", buildDate)

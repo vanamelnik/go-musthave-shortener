@@ -132,7 +132,7 @@ func generateKey() string {
 	return string(buf)
 }
 
-// checkURL проверяет входящую строку, является ли она URL с полями scheme и host
+// checkURL проверяет входящую строку, является ли она URL с полями scheme и host.
 func checkURL(u string) (*url.URL, error) {
 	url, err := url.Parse(u)
 	if err != nil {

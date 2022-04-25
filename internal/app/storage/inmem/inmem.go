@@ -125,7 +125,7 @@ func (db *DB) hasKey(ctx context.Context, key string) bool {
 	return err == nil
 }
 
-// hasUrl проверяет в базе записи с переданным url и в случае успеха возвращает ключ
+// hasUrl проверяет в базе записи с переданным url и в случае успеха возвращает ключ.
 func (db *DB) hasURL(url string) (key string, ok bool) {
 	db.RLock()
 	defer db.RUnlock()
@@ -157,7 +157,7 @@ func (db *DB) Get(ctx context.Context, key string) (string, error) {
 	return "", fmt.Errorf("DB: key %s not found", key)
 }
 
-// GetAll является реализацией метода GetAll интерфейса storage.Storage
+// GetAll является реализацией метода GetAll интерфейса storage.Storage.
 func (db *DB) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
 	list := make(map[string]string)
 

@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx"
+
+	//pgx is postgres driver.
 	_ "github.com/jackc/pgx/stdlib"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage"
 )
@@ -25,17 +27,17 @@ type Repo struct {
 func NewRepo(ctx context.Context, dsn string) (*Repo, error) {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("NewRepo: could not connect to the DB: %w", err)
+		return nil, fmt.Errorf("newRepo: could not connect to the DB: %w", err)
 	}
 	err = db.Ping()
 	if err != nil {
-		return nil, fmt.Errorf("NewRepo: ping to DB failed: %w", err)
+		return nil, fmt.Errorf("newRepo: ping to DB failed: %w", err)
 	}
 
 	r := Repo{db: db}
 	err = r.createTable(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("NewRepo: CreateTable: %w", err)
+		return nil, fmt.Errorf("newRepo: CreateTable: %w", err)
 	}
 
 	return &r, nil
@@ -59,7 +61,7 @@ func (r Repo) createTable(ctx context.Context) error {
 }
 
 // destructiveReset удаляет таблицу из хранилища и пересоздаёт её заново.
-func (r Repo) destructiveReset(ctx context.Context) error { //nolint unused
+func (r Repo) destructiveReset(ctx context.Context) error {
 	const query = `DROP TABLE IF EXISTS repo;`
 	res, err := r.db.ExecContext(ctx, query)
 	if err != nil {
