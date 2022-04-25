@@ -16,19 +16,19 @@ import (
 
 const (
 	baseURL   = "http://localhost:8080"
-	tmpDbFile = "tmpdb.gob"
+	tmpDBFile = "tmpdb.gob"
 	port      = ":3200"
 )
 
 func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
-	db, err := inmem.NewDB(tmpDbFile, time.Millisecond)
+	db, err := inmem.NewDB(tmpDBFile, time.Millisecond)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// в конце удаляем временный файл базы данных
 	defer func() {
-		if err := os.Remove(tmpDbFile); err != nil {
+		if err := os.Remove(tmpDBFile); err != nil {
 			log.Fatal(err)
 		}
 	}()
