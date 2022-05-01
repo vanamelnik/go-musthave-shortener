@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// deletechanSize - размер канала с очередью на удаление
+// deletechanSize - размер канала с очередью на удаление.
 const deleteChanSize = 100
 
 type (
@@ -68,7 +68,7 @@ func (dl DataLoader) BatchDelete(ctx context.Context, id uuid.UUID, keys []strin
 	return nil // error добавлен для совместимости со storage.BatchDelete
 }
 
-// Close закрывает сервис DataLoader
+// Close закрывает сервис DataLoader.
 func (dl DataLoader) Close() {
 	dl.ticker.Stop()
 	if dl.stopCh != nil {
@@ -95,7 +95,7 @@ func (dl DataLoader) aggregator() {
 	}
 }
 
-// flush отправляет накопленные данные по всем пользователям на удаление
+// flush отправляет накопленные данные по всем пользователям на удаление.
 func (dl DataLoader) flush() {
 	if len(dl.tasks) == 0 {
 		return

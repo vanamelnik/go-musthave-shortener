@@ -125,7 +125,7 @@ func (db *DB) hasKey(ctx context.Context, key string) bool {
 	return err == nil
 }
 
-// hasUrl проверяет в базе записи с переданным url и в случае успеха возвращает ключ
+// hasUrl проверяет в базе записи с переданным url и в случае успеха возвращает ключ.
 func (db *DB) hasURL(url string) (key string, ok bool) {
 	db.RLock()
 	defer db.RUnlock()
@@ -157,7 +157,7 @@ func (db *DB) Get(ctx context.Context, key string) (string, error) {
 	return "", fmt.Errorf("DB: key %s not found", key)
 }
 
-// GetAll является реализацией метода GetAll интерфейса storage.Storage
+// GetAll является реализацией метода GetAll интерфейса storage.Storage.
 func (db *DB) GetAll(ctx context.Context, id uuid.UUID) map[string]string {
 	list := make(map[string]string)
 
@@ -216,6 +216,21 @@ func (db *DB) BatchDelete(ctx context.Context, id uuid.UUID, keys []string) erro
 	}
 
 	return nil
+}
+
+// Stats - реализация метода интерфейса storage.Storage.
+func (db *DB) Stats(ctx context.Context) (urls int, users int, err error) {
+	urls = 0
+	userMap := make(map[uuid.UUID]struct{})
+	for _, row := range db.repo {
+		if row.Deleted { // не учитываем удаленные записи
+			continue
+		}
+		urls++
+		userMap[row.SessionID] = struct{}{}
+	}
+
+	return urls, len(userMap), nil
 }
 
 func (db *DB) Ping() error {

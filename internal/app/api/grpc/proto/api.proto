@@ -1,0 +1,89 @@
+/*
+    В данном пакете представлены методы для gRPC-вызовов сервиса Shortener
+
+    Методы GetUserURLs и DeleteURLs принимают ID существующего пользователя.
+    Методы ShortenURL, BatchShortenURL генерируют новый ID пользователя, если он не был передан в запросе.
+*/
+syntax="proto3";
+
+option go_package = "github.com/vanamelnik/go-musthave-shortener/internal/app/api/grpc/proto";
+
+package proto;
+
+message ShortenURLRequest {
+    string  url = 1;
+    string user_id =2;
+}
+message ShortenURLResponse {
+    string result = 1;
+    string user_id =2;
+    string error = 3;
+}
+
+message DecodeURLRequest {
+    string short_url = 1;
+}
+message DecodeURLResqponse {
+    string original_url = 1;
+    string error = 2;
+}
+
+message GetUserURLsRequest {
+    string  user_id = 1;
+}
+message GetUserURLsResponse {
+    message Record {
+        string short_url = 1;
+        string original_url = 2;
+    }
+    repeated Record records = 1;
+    string error = 2;
+}
+
+message BatchShortenRequest {
+    message Records {
+        string correlation_id = 1;
+        string url = 2;
+    }
+    repeated Records records = 1;
+    string user_id = 2;
+}
+message BatchShortenResponse {
+    message Records {
+        string correlation_id = 1;
+        string short_url = 2;
+    }
+    repeated Records records = 1;
+    string user_id =2;
+    string error = 3;
+}
+
+message DeleteURLsRequest {
+    repeated string keys = 1;
+    string user_id = 2;
+}
+message DeleteURLsResponse {
+    string error = 1;
+}
+
+message StatsResponse {
+    int32 urls = 1;
+    int32 users = 2;
+    string error = 3;
+}
+
+message PingResponse {
+    bool ok = 1;
+}
+
+message Empty {}
+
+service shortener {
+    rpc ShortenURL(ShortenURLRequest) returns (ShortenURLResponse);
+    rpc DecodeURL(DecodeURLRequest) returns (DecodeURLResqponse);
+    rpc GetUserURLs(GetUserURLsRequest) returns (GetUserURLsResponse);
+    rpc BatchShorten(BatchShortenRequest) returns (BatchShortenResponse);
+    rpc DeleteURLs(DeleteURLsRequest) returns (DeleteURLsResponse);
+    rpc Stats(Empty) returns (StatsResponse);
+    rpc Ping(Empty) returns (PingResponse);
+}

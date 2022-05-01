@@ -22,6 +22,9 @@ vendor/
 .idea
 .vscode
 
+#golangci config
+.golangci.yml
+
 # Temporary files
 tmp/
 
