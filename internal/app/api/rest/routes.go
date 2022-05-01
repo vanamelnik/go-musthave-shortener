@@ -5,7 +5,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/config"
-	"github.com/vanamelnik/go-musthave-shortener/internal/app/middleware"
+	"github.com/vanamelnik/go-musthave-shortener/pkg/middleware"
 )
 
 // SetupRoutes устанавливает пути для обработчиков ендпоинтов REST API.

@@ -9,9 +9,9 @@ import (
 
 	"github.com/google/uuid"
 	pb "github.com/vanamelnik/go-musthave-shortener/internal/app/api/grpc/proto"
-	"github.com/vanamelnik/go-musthave-shortener/internal/app/middleware"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/shortener"
 	"github.com/vanamelnik/go-musthave-shortener/internal/app/storage"
+	"github.com/vanamelnik/go-musthave-shortener/pkg/middleware"
 	"google.golang.org/grpc"
 )
 

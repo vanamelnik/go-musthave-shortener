@@ -170,7 +170,7 @@ func TestBatchShortenAndDelete(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.Empty(t, resp.Error)
-		time.Sleep(2 * time.Millisecond) // wait when dataloader flushes
+		time.Sleep(200 * time.Millisecond) // wait when dataloader flushes
 		respGet, err = w.client.GetUserURLs(ctx, &pb.GetUserURLsRequest{UserId: userID})
 		assert.NoError(t, err)
 		assert.Empty(t, respGet.Error)
